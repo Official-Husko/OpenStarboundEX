@@ -21,7 +21,7 @@ flat out int fragmentTextureIndex;
 out vec4 fragmentColor;
 out float fragmentLightMapMultiplier;
 out vec2 fragmentLightMapCoordinate;
-flat out float fragmentIsLiquid;
+flat out float fragmentLiquidScrollSpeed;
 
 void main() {
   vec2 screenPosition = (vertexTransform * vec3(vertexPosition, 1.0)).xy;
@@ -48,8 +48,9 @@ void main() {
   fragmentTextureIndex = vertexTextureIndex;
   fragmentColor = vertexColor;
 
-  // Bit 5 flags a liquid tile quad, for the water wave/shine effect.
-  fragmentIsLiquid = float((vertexData >> 5) & 0x1);
+  // Bits 5-12: quantized textureMovementFactor (0..8, 0 for non-liquid),
+  // used by the water wave/shine effect.
+  fragmentLiquidScrollSpeed = float((vertexData >> 5) & 0xFF) / 255.0 * 8.0;
 
   gl_Position = vec4(screenPosition / screenSize * 2.0 - 1.0, 0.0, 1.0);
 }

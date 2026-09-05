@@ -132,10 +132,11 @@ private:
     uint32_t fullbright : 1;
     uint32_t rX : 1;
     uint32_t rY : 1;
-    // RenderVertex::param2 > 0, marks a liquid tile quad for the world
-    // shader's water wave/shine effect.
-    uint32_t isLiquid : 1;
-    uint32_t unused : 21;
+    // Quantized RenderVertex::param2 (0..8, 256 steps), the liquid's own
+    // textureMovementFactor. 0 for anything that isn't liquid. Used by the
+    // world shader to scroll the liquid's texture for its wave/shine effect.
+    uint32_t liquidScrollSpeed : 8;
+    uint32_t unused : 19;
   };
 
   struct GlRenderVertex {

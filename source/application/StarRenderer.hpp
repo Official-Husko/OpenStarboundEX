@@ -48,12 +48,13 @@ struct RenderVertex {
   Vec4B color;
   float param1;
   // Generic secondary per-vertex scalar payload, defaulted to zero so every
-  // existing call site is unaffected.  Currently used as a boolean flag
-  // marking liquid tile quads, so the world shader can apply its water
-  // wave/shine effect only to those - the effect's actual shape is a
-  // continuous function of world position and time (see world.frag), not of
-  // this flag's value, so it reads seamlessly across tile boundaries instead
-  // of looking like a patchwork of independently animated tiles.
+  // existing call site is unaffected.  Currently used on liquid tile quads
+  // to carry that liquid's LiquidSettings::textureMovementFactor (0 for
+  // anything that isn't liquid), so the world shader can scroll its texture
+  // for a wave/shine effect. It's the same value for every tile of a given
+  // liquid type, never something computed per-tile, so it reads seamlessly
+  // across tile boundaries instead of looking like a patchwork of
+  // independently animated tiles (see world.frag).
   float param2 = 0.0f;
 };
 

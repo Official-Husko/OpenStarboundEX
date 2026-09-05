@@ -384,15 +384,19 @@ void TilePainter::produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive
 
   auto const& liquid = m_liquids[tile.liquidId];
 
-  // Marks this quad as liquid for world.frag's water wave/shine effect (see
-  // there for why the effect itself is computed purely from continuous
-  // world position + time rather than any per-tile value: it keeps every
-  // tile's result seamless with its neighbors instead of looking like a
-  // patchwork of independently animated tiles).
-  RenderVertex vA{worldRect.min(), texRect.min(), liquid.color, 1.0f, 1.0f};
-  RenderVertex vB{Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()), liquid.color, 1.0f, 1.0f};
-  RenderVertex vC{worldRect.max(), texRect.max(), liquid.color, 1.0f, 1.0f};
-  RenderVertex vD{Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()), liquid.color, 1.0f, 1.0f};
+  // Drives world.frag's wave/shine effect by scrolling the liquid's own
+  // texture - the base liquid textures are soft repeating light/dark bands
+  // (not detailed water photos), clearly meant to be animated this way:
+  // textureMovementFactor has been sitting in liquid configs unused since
+  // before this pass. Passing the same value for every tile of this liquid
+  // type (never anything computed per-tile) keeps it seamless across tile
+  // boundaries instead of looking like a patchwork of independently
+  // animated tiles.
+  float scroll = liquid.textureMovementFactor;
+  RenderVertex vA{worldRect.min(), texRect.min(), liquid.color, 1.0f, scroll};
+  RenderVertex vB{Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()), liquid.color, 1.0f, scroll};
+  RenderVertex vC{worldRect.max(), texRect.max(), liquid.color, 1.0f, scroll};
+  RenderVertex vD{Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()), liquid.color, 1.0f, scroll};
 
   primitives[tile.liquidId].emplace_back(std::in_place_type_t<RenderQuad>(), liquid.texture, vA, vB, vC, vD);
 }

@@ -15,7 +15,7 @@ flat in int fragmentTextureIndex;
 in vec4 fragmentColor;
 in float fragmentLightMapMultiplier;
 in vec2 fragmentLightMapCoordinate;
-flat in float fragmentIsLiquid;
+flat in float fragmentLiquidScrollSpeed;
 
 out vec4 outColor;
 
@@ -68,30 +68,26 @@ vec3 sampleLight(vec2 coord, vec2 scale) {
 
 void main() {
   vec2 sampleCoordinate = fragmentTextureCoordinate;
-  float waterShine = 0.0;
 
-  if (fragmentIsLiquid > 0.5) {
-    // Water wave/shine: purely a function of continuous world position
-    // (fragmentTextureCoordinate is proportional to world space) and time,
-    // never of any per-tile/per-vertex value. That's the whole point - it
-    // guarantees every liquid tile computes near-identical values right up
-    // to its neighbor's edge, so the whole body reads as one continuous
-    // surface instead of a patchwork of independently animated tiles.
-    vec2 p = fragmentTextureCoordinate;
+  if (fragmentLiquidScrollSpeed > 0.0) {
+    // Water wave/shine: liquid textures (see e.g. /liquids/watertex.png)
+    // are soft repeating light/dark gradient bands, not detailed water
+    // photos - they're clearly meant to be animated by scrolling, which is
+    // exactly what the long-unused textureMovementFactor field is for. This
+    // is the SAME value (never a per-tile computed one) for every tile of a
+    // given liquid, so every tile scrolls in lockstep with its neighbors -
+    // no seams, no patchwork.
+    //
+    // fragmentTextureCoordinate is in texture-widths (normalized by the
+    // liquid texture's own pixel size), so this scroll speed is directly in
+    // "texture repeats per second" - visibly sweeping the gradient bands
+    // across the whole body.
+    sampleCoordinate.x += fragmentLiquidScrollSpeed * time * 0.15;
 
-    // Small vertical ripple from a couple of overlapping, differently-paced
-    // waves travelling across x, plus a much smaller counter-ripple in y so
-    // it doesn't look like a single repeating wave train.
-    float ripple = sin(p.x * 0.05 + time * 0.9) * 0.6
-                 + sin(p.x * 0.13 - time * 0.6 + 1.7) * 0.4;
-    sampleCoordinate.y += ripple * 0.06;
-    sampleCoordinate.x += sin(p.y * 0.08 + time * 0.5 + 0.9) * 0.03;
-
-    // Drifting glints: product of two independent sine fields gives a
-    // patchy, semi-random-looking highlight that moves smoothly over time
-    // without ever repeating in an obviously tiled way.
-    waterShine = sin(p.x * 0.21 + time * 1.1) * sin(p.y * 0.17 - time * 0.7 + 2.1);
-    waterShine = max(waterShine, 0.0);
+    // A gentle vertical wave on top, so it doesn't read as pure horizontal
+    // scrolling. Wavelength/speed deliberately different from the scroll so
+    // the two don't visually lock together.
+    sampleCoordinate.y += sin(fragmentTextureCoordinate.x * 0.35 + time * 0.8) * 0.12;
   }
 
   vec4 texColor;
@@ -108,11 +104,6 @@ void main() {
     discard;
 
   vec4 finalColor = texColor * fragmentColor;
-
-  // Subtle additive glint from the water shine field above. Additive (not a
-  // mix towards white) so it never looks like a flat painted-on patch, and
-  // small enough to read as a highlight rather than recoloring the water.
-  finalColor.rgb += vec3(waterShine) * 0.08;
 
   float finalLightMapMultiplier = fragmentLightMapMultiplier * lightMapMultiplier;
   if (texColor.a == 0.99607843137)

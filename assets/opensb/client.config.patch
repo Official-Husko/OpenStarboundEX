@@ -31,14 +31,19 @@
   // WorldClient::spawnLiquidFoamParticles). velocity here is only used for
   // its magnitude - the actual direction is computed per-particle, away
   // from whichever wall it's foaming against.
+  //
+  // Reuses the gas-cloud puff animation (a soft round blob that dissolves
+  // into wisps over 8 frames - see /animations/gas/bluegas.animation),
+  // tinted white, instead of /particles/splash/1.png - that sprite turned
+  // out to be a tiny star/spark icon meant for a raindrop's impact instant,
+  // not a lingering foam clump, and read as "sparks shooting out" in-game.
   { "op" : "add", "path" : "/liquidFoamParticle", "value" : {
-    "type" : "textured",
-    "image" : "/particles/splash/1.png",
-    "size" : 0.4,
-    "color" : [255, 255, 255, 200],
-    "velocity" : [1.2, 0],
-    "timeToLive" : 0.6,
-    "destructionAction" : "shrink",
+    "type" : "animated",
+    "animation" : "/animations/gas/bluegas.animation",
+    "size" : 0.6,
+    "color" : [255, 255, 255, 220],
+    "velocity" : [1.2, 0.4],
+    "timeToLive" : 0.9,
     "layer" : "middle",
     "fullbright" : false,
     "collidesForeground" : false,
@@ -46,8 +51,8 @@
     "ignoreWind" : true
   }},
   { "op" : "add", "path" : "/liquidFoamParticleVariance", "value" : {
-    "size" : 0.15,
-    "timeToLive" : 0.25,
+    "size" : 0.2,
+    "timeToLive" : 0.3,
     "rotation" : 360,
     "position" : [0.15, 0.1]
   }},
