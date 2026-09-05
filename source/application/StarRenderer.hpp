@@ -47,6 +47,11 @@ struct RenderVertex {
   Vec2F textureCoordinate;
   Vec4B color;
   float param1;
+  // Generic secondary per-vertex vector payload, defaulted to zero so every
+  // existing call site is unaffected.  Currently used to carry liquid current
+  // direction/strength (see TilePainter::produceLiquidPrimitives) through to
+  // the world shader for the flow shimmer effect.
+  Vec2F param2 = Vec2F();
 };
 
 class RenderTriangle {

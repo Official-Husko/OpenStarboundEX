@@ -7,6 +7,7 @@
 #include "StarAssets.hpp"
 #include "StarRoot.hpp"
 #include "StarTileDrawer.hpp"
+#include "StarTime.hpp"
 
 namespace Star {
 
@@ -90,6 +91,10 @@ void TilePainter::renderLiquid(WorldCamera const& camera) {
   transformation.translate(-Vec2F(camera.worldTileRect().min()));
   transformation.scale(TilePixels * camera.pixelRatio());
   transformation.translate(camera.tileMinScreen());
+
+  // Drives the flow shimmer in world.frag. Wrapped well below float precision
+  // limits since it only needs to stay smooth, not track wall-clock time.
+  m_renderer->setEffectParameter("time", (float)fmod(Time::monotonicTime(), 10000.0));
 
   for (auto const& chunk : m_pendingLiquidChunks) {
     for (auto const& p : *chunk)
@@ -377,13 +382,24 @@ void TilePainter::produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive
 
   auto texRect = worldRect.scaled(TilePixels);
 
+  // Cosmetic current direction/strength for the flow shimmer effect in
+  // world.frag, derived the same way as the gameplay current in
+  // MovementController::sampleLiquidFlowVelocity: liquid tends to move from
+  // tiles with a higher level towards tiles with a lower one.
+  auto neighborLevel = [&](Vec2I const& offset) {
+    return byteToFloat(getRenderTile(renderData, pos + offset).liquidLevel);
+  };
+  Vec2F flow(neighborLevel(Vec2I(-1, 0)) - neighborLevel(Vec2I(1, 0)),
+             neighborLevel(Vec2I(0, -1)) - neighborLevel(Vec2I(0, 1)));
+
   auto const& liquid = m_liquids[tile.liquidId];
-  primitives[tile.liquidId].emplace_back(std::in_place_type_t<RenderQuad>(), liquid.texture,
-      worldRect.min(), texRect.min(),
-      Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()),
-      worldRect.max(), texRect.max(),
-      Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()),
-    liquid.color, 1.0f);
+
+  RenderVertex vA{worldRect.min(), texRect.min(), liquid.color, 1.0f, flow};
+  RenderVertex vB{Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()), liquid.color, 1.0f, flow};
+  RenderVertex vC{worldRect.max(), texRect.max(), liquid.color, 1.0f, flow};
+  RenderVertex vD{Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()), liquid.color, 1.0f, flow};
+
+  primitives[tile.liquidId].emplace_back(std::in_place_type_t<RenderQuad>(), liquid.texture, vA, vB, vC, vD);
 }
 
 float TilePainter::liquidDrawLevel(float liquidLevel) const {

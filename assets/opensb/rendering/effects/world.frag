@@ -8,12 +8,14 @@ uniform bool lightMapEnabled;
 uniform vec2 lightMapSize;
 uniform sampler2D lightMap;
 uniform float lightMapMultiplier;
+uniform float time;
 
 in vec2 fragmentTextureCoordinate;
 flat in int fragmentTextureIndex;
 in vec4 fragmentColor;
 in float fragmentLightMapMultiplier;
 in vec2 fragmentLightMapCoordinate;
+in vec2 fragmentFlow;
 
 out vec4 outColor;
 
@@ -65,15 +67,29 @@ vec3 sampleLight(vec2 coord, vec2 scale) {
 }
 
 void main() {
+  vec2 sampleCoordinate = fragmentTextureCoordinate;
+
+  // Flowing liquid shimmer: drift the sample point along the current's
+  // direction over time, plus a perpendicular wobble whose amplitude scales
+  // with current strength, so still liquid is completely unaffected.
+  float flowSpeed = length(fragmentFlow);
+  if (flowSpeed > 0.0001) {
+    vec2 flowDirection = fragmentFlow / flowSpeed;
+    vec2 perpendicular = vec2(-flowDirection.y, flowDirection.x);
+    float scroll = time * flowSpeed * 0.4;
+    float wobble = sin(time * 2.2 + scroll * 6.0) * 0.4 * flowSpeed;
+    sampleCoordinate += flowDirection * scroll + perpendicular * wobble;
+  }
+
   vec4 texColor;
   if (fragmentTextureIndex == 3)
-    texColor = texture(texture3, fragmentTextureCoordinate);
+    texColor = texture(texture3, sampleCoordinate);
   else if (fragmentTextureIndex == 2)
-    texColor = texture(texture2, fragmentTextureCoordinate);
+    texColor = texture(texture2, sampleCoordinate);
   else if (fragmentTextureIndex == 1)
-    texColor = texture(texture1, fragmentTextureCoordinate);
+    texColor = texture(texture1, sampleCoordinate);
   else
-    texColor = texture(texture0, fragmentTextureCoordinate);
+    texColor = texture(texture0, sampleCoordinate);
 
   if (texColor.a <= 0.0)
     discard;

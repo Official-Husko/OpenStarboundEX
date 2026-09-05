@@ -132,7 +132,12 @@ private:
     uint32_t fullbright : 1;
     uint32_t rX : 1;
     uint32_t rY : 1;
-    uint32_t unused : 27;
+    // Quantized direction (256 steps around a circle) and strength (64 steps)
+    // of RenderVertex::param2, used by the world shader's liquid flow shimmer.
+    // Zero for anything that doesn't set param2.
+    uint32_t flowAngle : 8;
+    uint32_t flowSpeed : 6;
+    uint32_t unused : 13;
   };
 
   struct GlRenderVertex {

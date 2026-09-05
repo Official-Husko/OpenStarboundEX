@@ -21,6 +21,7 @@ flat out int fragmentTextureIndex;
 out vec4 fragmentColor;
 out float fragmentLightMapMultiplier;
 out vec2 fragmentLightMapCoordinate;
+out vec2 fragmentFlow;
 
 void main() {
   vec2 screenPosition = (vertexTransform * vec3(vertexPosition, 1.0)).xy;
@@ -46,5 +47,13 @@ void main() {
 
   fragmentTextureIndex = vertexTextureIndex;
   fragmentColor = vertexColor;
+
+  // Bits 5-12 hold a quantized flow angle (0-255 -> 0..2pi), bits 13-18 hold
+  // quantized flow strength (0-63 -> 0..1). Both are zero for anything that
+  // isn't a flowing liquid tile, which collapses fragmentFlow to (0,0).
+  float flowAngle = float((vertexData >> 5) & 0xFF) / 255.0 * 6.28318530718 - 3.14159265359;
+  float flowSpeed = float((vertexData >> 13) & 0x3F) / 63.0;
+  fragmentFlow = vec2(cos(flowAngle), sin(flowAngle)) * flowSpeed;
+
   gl_Position = vec4(screenPosition / screenSize * 2.0 - 1.0, 0.0, 1.0);
 }
