@@ -36,6 +36,13 @@ struct WeatherType {
   float maximumWind;
   Vec2F duration;
   StringList weatherNoises;
+
+  // Average number of lightning strikes per second at full weather
+  // intensity. 0 (the default) disables lightning entirely for this weather
+  // type - existing weather configs are unaffected unless they opt in.
+  float lightningChance;
+  // Thunderclap sounds to pick from when a strike occurs.
+  StringList thunderSounds;
 };
 
 typedef WeightedPool<String> WeatherPool;

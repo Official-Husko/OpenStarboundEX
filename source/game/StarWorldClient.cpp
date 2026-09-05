@@ -793,6 +793,7 @@ void WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles) {
   renderData.isFullbright = m_fullBright;
   renderData.dimLevel = m_worldDimLevel;
   renderData.dimColor = m_worldDimColor;
+  renderData.lightningFlash = m_weather.lightningFlash();
 }
 
 List<AudioInstancePtr> WorldClient::pullPendingAudio() {
@@ -1363,6 +1364,7 @@ void WorldClient::update(float dt) {
       m_samples.append(audioSample);
     if (auto audioSample = m_ambientSounds.updateWeather(currentWeatherNoises()))
       m_samples.append(audioSample);
+    m_samples.appendAll(m_weather.pullSounds());
 
     if (inSpace()) {
       m_samples.appendAll(m_sky->pullSounds());

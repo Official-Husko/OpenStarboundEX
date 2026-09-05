@@ -8,6 +8,7 @@ namespace Star {
 
 STAR_CLASS(Clock);
 STAR_CLASS(Projectile);
+STAR_CLASS(AudioInstance);
 
 STAR_CLASS(ServerWeather);
 STAR_CLASS(ClientWeather);
@@ -57,6 +58,13 @@ public:
 private:
   void setNetStates();
 
+  // Re-rolls the gust target at random intervals and eases m_currentWind
+  // towards it, rather than holding wind at a fixed value for the storm.
+  void updateWind(double dt);
+  // Resets the gust simulation so a fresh target is rolled on the very next
+  // updateWind() call, and wind starts from calm (0) rather than jumping.
+  void resetWind();
+
   void spawnWeatherProjectiles(float dt);
 
   WeatherPool m_weatherPool;
@@ -70,6 +78,12 @@ private:
   Maybe<WeatherType> m_currentWeatherType;
   float m_currentWeatherIntensity;
   float m_currentWind;
+
+  // Gusting wind simulation: m_currentWind eases towards m_windTarget, which
+  // is re-rolled at random intervals, rather than being pinned at a single
+  // value for the whole weather event.  See updateWind().
+  float m_windTarget;
+  double m_nextGustChangeTime;
 
   bool m_forceWeather;
 
@@ -110,10 +124,16 @@ public:
   List<Particle> pullNewParticles();
   StringList weatherTrackOptions() const;
 
+  // Current lightning flash brightness, 0 (none) to 1 (peak of a strike).
+  float lightningFlash() const;
+  // One-shot thunderclap sounds ready to be handed off to the audio mixer.
+  List<AudioInstancePtr> pullSounds();
+
 private:
   void getNetStates();
 
   void spawnWeatherParticles(RectF newClientRegion, float dt);
+  void updateLightning(float dt);
 
   WeatherPool m_weatherPool;
   float m_undergroundLevel;
@@ -130,6 +150,19 @@ private:
 
   List<Particle> m_particles;
   RectF m_lastParticleVisibleRegion;
+
+  // Lightning is rolled independently on each client - it's purely cosmetic
+  // (screen flash + delayed thunderclap), so there's no need to synchronize
+  // strikes between players over the network.
+  struct PendingThunder {
+    double delay;
+    float volume;
+    float pitch;
+    String sound;
+  };
+  float m_lightningFlash;
+  List<PendingThunder> m_pendingThunder;
+  List<AudioInstancePtr> m_pendingSounds;
 
   NetElementTopGroup m_netGroup;
   NetElementBytes m_weatherPoolNetState;

@@ -45,6 +45,10 @@ struct WorldRenderData {
   bool isFullbright = false;
   float dimLevel = 0.0f;
   Vec3B dimColor;
+
+  // Current lightning flash brightness from ClientWeather::lightningFlash,
+  // 0 (none) to 1 (peak), rendered as a brief full-screen tint.
+  float lightningFlash = 0.0f;
 };
 
 inline void WorldRenderData::clear() {

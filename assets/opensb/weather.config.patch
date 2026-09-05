@@ -1,0 +1,35 @@
+[
+  { "op" : "merge", "path" : "", "value" : {
+    // Gusting wind tuning (see ServerWeather::updateWind). Wind eases towards
+    // a target that's re-rolled every gustMinInterval-gustMaxInterval
+    // seconds, rather than being pinned at one value for the whole event.
+    "gustMinInterval" : 2.0,
+    "gustMaxInterval" : 9.0,
+    // Roughly how many seconds it takes wind to ease most of the way towards
+    // a new gust target. Lower is gustier/sharper, higher is a steadier breeze.
+    "gustSmoothingTime" : 3.5,
+
+    // Lightning (see ClientWeather::updateLightning). Only weather types that
+    // set lightningChance are affected - existing weather is unchanged.
+    // Strikes are rolled independently per-client, since they're purely
+    // cosmetic (screen flash + optional delayed thunderclap).
+    "lightningFlashDecayTime" : 0.3,
+    "thunderMaxDelay" : 4.0
+  }},
+
+  // The base game ships "hailstones", "fog", and "groundmist" as complete
+  // weather types (falling damaging hail, and fog-primer projectiles that
+  // bloom into drifting cloud particles), but never actually wires any of
+  // them into a biome's weather pool - they were unused. Give a few biomes
+  // a rare chance of each, alongside their existing storms.
+  { "op" : "add", "path" : "/garden/-", "value" : [0.01, "hailstones"] },
+  { "op" : "add", "path" : "/forest/-", "value" : [0.015, "hailstones"] },
+  { "op" : "add", "path" : "/ocean/-", "value" : [0.015, "hailstones"] },
+  { "op" : "add", "path" : "/jungle/-", "value" : [0.01, "hailstones"] },
+
+  { "op" : "add", "path" : "/garden/-", "value" : [0.03, "fog"] },
+  { "op" : "add", "path" : "/ocean/-", "value" : [0.03, "fog"] },
+
+  { "op" : "add", "path" : "/forest/-", "value" : [0.04, "groundmist"] },
+  { "op" : "add", "path" : "/jungle/-", "value" : [0.03, "groundmist"] }
+]

@@ -9,6 +9,7 @@ namespace Star {
 
 WeatherType::WeatherType() {
   maximumWind = 0;
+  lightningChance = 0;
 }
 
 WeatherType::WeatherType(Json config, String path) {
@@ -43,6 +44,9 @@ WeatherType::WeatherType(Json config, String path) {
   duration = jsonToVec2F(config.get("duration"));
   weatherNoises = jsonToStringList(config.get("weatherNoises", JsonArray()));
   statusEffects = jsonToStringList(config.get("statusEffects", JsonArray()));
+
+  lightningChance = config.getFloat("lightningChance", 0.0f);
+  thunderSounds = jsonToStringList(config.get("thunderSounds", JsonArray()));
 }
 
 Json WeatherType::toJson() const {
@@ -65,7 +69,9 @@ Json WeatherType::toJson() const {
       {"maximumWind", maximumWind},
       {"duration", jsonFromVec2F(duration)},
       {"weatherNoises", jsonFromStringList(weatherNoises)},
-      {"statusEffects", jsonFromStringList(statusEffects)}};
+      {"statusEffects", jsonFromStringList(statusEffects)},
+      {"lightningChance", lightningChance},
+      {"thunderSounds", jsonFromStringList(thunderSounds)}};
 }
 
 DataStream& operator>>(DataStream& ds, WeatherType& weatherType) {
@@ -90,6 +96,8 @@ DataStream& operator>>(DataStream& ds, WeatherType& weatherType) {
   ds.read(weatherType.duration);
   ds.readContainer(weatherType.weatherNoises);
   ds.readContainer(weatherType.statusEffects);
+  ds.read(weatherType.lightningChance);
+  ds.readContainer(weatherType.thunderSounds);
 
   return ds;
 }
@@ -116,6 +124,8 @@ DataStream& operator<<(DataStream& ds, WeatherType const& weatherType) {
   ds.write(weatherType.duration);
   ds.writeContainer(weatherType.weatherNoises);
   ds.writeContainer(weatherType.statusEffects);
+  ds.write(weatherType.lightningChance);
+  ds.writeContainer(weatherType.thunderSounds);
 
   return ds;
 }

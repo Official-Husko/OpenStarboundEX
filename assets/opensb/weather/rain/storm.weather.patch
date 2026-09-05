@@ -1,0 +1,21 @@
+[
+  // Turns the existing "storm" weather (the heaviest rain tier, already used
+  // by garden/forest/ocean/jungle) into a proper thunderstorm. See
+  // ClientWeather::updateLightning in StarWeather.cpp.
+  //
+  // NOTE: this must stay an RFC6902 "add" operation, not a plain-object merge
+  // patch. Weather types are bulk-prefetched eagerly by BiomeDatabase at
+  // startup, and a plain-object merge patch against a .weather file crashes
+  // the game there ((JsonException) Improper conversion to JsonArray from
+  // object) - confirmed against the real engine (1.4.4). The array/"add"
+  // form below does not have this problem.
+  //
+  // Deliberately left without "thunderSounds": the base game has no thunder
+  // sound effect to reuse (only rain/blizzard/sandstorm loops exist under
+  // /sfx/weather), so this ships flash-only rather than repurposing an
+  // unrelated sound (mech explosion, cave-in rumble, etc). Add
+  // { "op": "add", "path": "/thunderSounds", "value": [...] } here once a
+  // proper thunderclap sound is available, and claps will start playing
+  // automatically - no code changes needed.
+  { "op" : "add", "path" : "/lightningChance", "value" : 0.06 }
+]

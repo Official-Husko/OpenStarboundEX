@@ -155,6 +155,15 @@ void WorldPainter::render(WorldRenderData& renderData, function<bool()> lightWai
   if (dimLevel != 0)
     m_renderer->render(renderFlatRect(RectF::withSize({}, Vec2F(m_camera.screenSize())), Vec4B(renderData.dimColor, dimLevel), 0.0f));
 
+  if (renderData.lightningFlash > 0.0f) {
+    // Capped well below full opacity so a strike reads as a bright flash
+    // rather than a solid white-out, and drawn after the dim rect so it
+    // correctly cuts through night-time darkness.
+    float const lightningFlashMaxAlpha = 0.6f;
+    auto flashAlpha = round(clamp(renderData.lightningFlash, 0.0f, 1.0f) * lightningFlashMaxAlpha * 255);
+    m_renderer->render(renderFlatRect(RectF::withSize({}, Vec2F(m_camera.screenSize())), Vec4B(235, 240, 255, (uint8_t)flashAlpha), 0.0f));
+  }
+
   int64_t textureTimeout = m_assets->json("/rendering.config:textureTimeout").toInt();
   m_textPainter->cleanup(textureTimeout);
   m_drawablePainter->cleanup(textureTimeout);

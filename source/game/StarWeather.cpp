@@ -7,6 +7,7 @@
 #include "StarProjectileDatabase.hpp"
 #include "StarProjectile.hpp"
 #include "StarBiomeDatabase.hpp"
+#include "StarMixer.hpp"
 
 namespace Star {
 
@@ -15,6 +16,8 @@ ServerWeather::ServerWeather() {
   m_currentWeatherIndex = NPos;
   m_currentWeatherIntensity = 0.0f;
   m_currentWind = 0.0f;
+  m_windTarget = 0.0f;
+  m_nextGustChangeTime = 0.0;
   m_forceWeather = false;
 
   m_currentTime = 0.0;
@@ -42,6 +45,8 @@ void ServerWeather::setup(WeatherPool weatherPool, float undergroundLevel, World
   m_currentTime = 0.0;
   m_lastWeatherChangeTime = 0.0;
   m_nextWeatherChangeTime = 0.0;
+
+  resetWind();
 }
 
 void ServerWeather::setReferenceClock(ClockConstPtr referenceClock) {
@@ -98,8 +103,9 @@ void ServerWeather::update(double dt) {
       m_lastWeatherChangeTime = m_nextWeatherChangeTime;
       m_nextWeatherChangeTime = m_currentTime + Random::randd(m_currentWeatherType->duration[0], m_currentWeatherType->duration[1]);
 
-      // TODO: For now just set the wind at maximum either left or right, nothing exciting.
-      m_currentWind = m_currentWeatherType->maximumWind * (Random::randb() ? 1 : -1);
+      // Start calm and let updateWind() gust up naturally, rather than
+      // snapping straight to a random value from the previous storm.
+      resetWind();
     }
 
     m_currentWeatherIntensity = min(clamp((m_currentTime - m_lastWeatherChangeTime) / weatherWarmupTime, 0.0, 1.0),
@@ -109,6 +115,38 @@ void ServerWeather::update(double dt) {
     m_currentWeatherIndex = NPos;
     m_currentWeatherType = {};
   }
+
+  updateWind(dt);
+}
+
+void ServerWeather::resetWind() {
+  m_currentWind = 0.0f;
+  m_windTarget = 0.0f;
+  m_nextGustChangeTime = m_currentTime;
+}
+
+void ServerWeather::updateWind(double dt) {
+  float maximumWind = m_currentWeatherType ? m_currentWeatherType->maximumWind : 0.0f;
+  if (maximumWind <= 0.0f) {
+    m_currentWind = 0.0f;
+    m_windTarget = 0.0f;
+    return;
+  }
+
+  auto assets = Root::singleton().assets();
+  if (m_currentTime >= m_nextGustChangeTime) {
+    // Re-roll a new gust target at a random interval, rather than holding
+    // wind fixed for the whole weather event.  Because the wind eases
+    // towards this target rather than snapping to it, it naturally passes
+    // back through calm whenever a new target reverses direction.
+    m_windTarget = Random::randf(-maximumWind, maximumWind);
+    double gustMinInterval = assets->json("/weather.config:gustMinInterval").toDouble();
+    double gustMaxInterval = assets->json("/weather.config:gustMaxInterval").toDouble();
+    m_nextGustChangeTime = m_currentTime + Random::randd(gustMinInterval, gustMaxInterval);
+  }
+
+  double gustSmoothingTime = assets->json("/weather.config:gustSmoothingTime").toDouble();
+  m_currentWind += (m_windTarget - m_currentWind) * (float)clamp(dt / gustSmoothingTime, 0.0, 1.0);
 }
 
 float ServerWeather::wind() const {
@@ -154,14 +192,14 @@ void ServerWeather::setWeatherIndex(size_t weatherIndex, bool force) {
     m_currentWeatherIndex = NPos;
     m_currentWeatherType = {};
     m_currentWeatherIntensity = 0.0f;
-    m_currentWind = 0.0f;
   } else {
     m_currentWeatherIndex = weatherIndex;
     m_currentWeatherType =
       Root::singleton().biomeDatabase()->weatherType(m_weatherPool.item(m_currentWeatherIndex));
     m_currentWeatherIntensity = 1.0f;
-    m_currentWind = m_currentWeatherType->maximumWind * (Random::randb() ? 1 : -1);
   }
+  // Let updateWind() gust up naturally from calm on the next update() tick.
+  resetWind();
 
   m_lastWeatherChangeTime = m_currentTime;
   if (m_forceWeather)
@@ -306,6 +344,7 @@ ClientWeather::ClientWeather() {
   m_currentWeatherIntensity = 0.0f;
   m_currentWind = 0.0f;
   m_currentTime = 0.0;
+  m_lightningFlash = 0.0f;
 
   m_netGroup.addNetElement(&m_weatherPoolNetState);
   m_netGroup.addNetElement(&m_undergroundLevelNetState);
@@ -345,6 +384,8 @@ void ClientWeather::update(double dt) {
 
   if (m_currentWeatherType && m_visibleRegion != RectI())
     spawnWeatherParticles(RectF(m_visibleRegion), dt);
+
+  updateLightning(dt);
 }
 
 float ClientWeather::wind() const {
@@ -369,6 +410,61 @@ StringList ClientWeather::weatherTrackOptions() const {
   if (m_currentWeatherType)
     return m_currentWeatherType->weatherNoises;
   return {};
+}
+
+float ClientWeather::lightningFlash() const {
+  return m_lightningFlash;
+}
+
+List<AudioInstancePtr> ClientWeather::pullSounds() {
+  return take(m_pendingSounds);
+}
+
+void ClientWeather::updateLightning(float dt) {
+  auto assets = Root::singleton().assets();
+
+  if (m_lightningFlash > 0.0f) {
+    float flashDecayTime = assets->json("/weather.config:lightningFlashDecayTime").toFloat();
+    m_lightningFlash = max(0.0f, m_lightningFlash - dt / flashDecayTime);
+  }
+
+  if (m_currentWeatherType && m_currentWeatherType->lightningChance > 0.0f) {
+    float strikeChance = m_currentWeatherType->lightningChance * weatherIntensity() * dt;
+    if (Random::randf() < strikeChance) {
+      m_lightningFlash = 1.0f;
+
+      // Thunder is optional - a weather type can flash without a thunderclap
+      // if it has no thunderSounds configured.
+      if (!m_currentWeatherType->thunderSounds.empty()) {
+        // Fake a rough sense of distance: near strikes crack loud and almost
+        // instantly, far strikes rumble in quieter, well after the flash.
+        float maxDelay = assets->json("/weather.config:thunderMaxDelay").toFloat();
+        float distance = Random::randf();
+
+        PendingThunder thunder;
+        thunder.delay = distance * maxDelay;
+        thunder.volume = lerp(distance, 1.0f, 0.35f);
+        thunder.pitch = Random::randf(0.85f, 1.15f);
+        thunder.sound = Random::randValueFrom(m_currentWeatherType->thunderSounds);
+        m_pendingThunder.append(std::move(thunder));
+      }
+    }
+  }
+
+  auto it = makeSMutableIterator(m_pendingThunder);
+  while (it.hasNext()) {
+    auto& thunder = it.next();
+    thunder.delay -= dt;
+    if (thunder.delay <= 0.0) {
+      if (auto audio = assets->tryAudio(thunder.sound)) {
+        auto instance = make_shared<AudioInstance>(*audio);
+        instance->setVolume(thunder.volume);
+        instance->setPitchMultiplier(thunder.pitch);
+        m_pendingSounds.append(std::move(instance));
+      }
+      it.remove();
+    }
+  }
 }
 
 void ClientWeather::getNetStates() {
