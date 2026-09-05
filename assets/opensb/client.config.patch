@@ -1,22 +1,55 @@
-{
-  "universeScriptContexts" : { "OpenStarbound" : ["/scripts/opensb/universeclient/universeclient.lua"] },
+[
+  // NOTE: kept as an RFC6902 array/"add" patch (never a plain-object merge
+  // patch, and never the custom "merge" op) for this specific file. Testing
+  // against the real engine turned up a startup race: /client.config is
+  // read very early, from multiple database constructors on different
+  // worker threads at once (MaterialDatabase and ItemDatabase both pull
+  // defaultFootstepSound from it), and a plain-object merge patch here
+  // reproducibly crashes with (JsonException) Improper conversion to
+  // JsonArray from object - even for the pre-existing content below, which
+  // ships fine as a plain-object patch in production (this looks like a
+  // pre-existing concurrency issue in the asset/patch cache under
+  // concurrent first-access, not something specific to this content).
+  // Per-key "add" operations have not reproduced the crash in any test.
+  // See CLAUDE.md.
+  { "op" : "add", "path" : "/universeScriptContexts", "value" : { "OpenStarbound" : ["/scripts/opensb/universeclient/universeclient.lua"] } },
 
   // Disables scissoring and letterboxing on vanilla and modded warp cinematics
-  "warpCinematicBase" : {
-    "scissor" : false,
-    "letterbox" : false
-  },
-  "deployCinematicBase" : {
-    "scissor" : false,
-    "letterbox" : false
-  },
-  "postProcessLayers": [],
-  "postProcessGroups": {},
-  
-  "worldScriptContexts":{},
-  "mainWorldScriptContexts":{},
-  "subWorldScriptContexts":{},
-  
-  "idleSubWorldExpireTime":10.0,
-  "subWorldUpdateMeasureWindow" : 0.5
-}
+  { "op" : "add", "path" : "/warpCinematicBase", "value" : { "scissor" : false, "letterbox" : false } },
+  { "op" : "add", "path" : "/deployCinematicBase", "value" : { "scissor" : false, "letterbox" : false } },
+  { "op" : "add", "path" : "/postProcessLayers", "value" : [] },
+  { "op" : "add", "path" : "/postProcessGroups", "value" : {} },
+
+  { "op" : "add", "path" : "/worldScriptContexts", "value" : {} },
+  { "op" : "add", "path" : "/mainWorldScriptContexts", "value" : {} },
+  { "op" : "add", "path" : "/subWorldScriptContexts", "value" : {} },
+
+  { "op" : "add", "path" : "/idleSubWorldExpireTime", "value" : 10.0 },
+  { "op" : "add", "path" : "/subWorldUpdateMeasureWindow", "value" : 0.5 },
+
+  // Ambient foam particles where a flowing liquid surface hits a wall (see
+  // WorldClient::spawnLiquidFoamParticles). velocity here is only used for
+  // its magnitude - the actual direction is computed per-particle, away
+  // from whichever wall it's foaming against.
+  { "op" : "add", "path" : "/liquidFoamParticle", "value" : {
+    "type" : "textured",
+    "image" : "/particles/splash/1.png",
+    "size" : 0.4,
+    "color" : [255, 255, 255, 200],
+    "velocity" : [1.2, 0],
+    "timeToLive" : 0.6,
+    "destructionAction" : "shrink",
+    "layer" : "middle",
+    "fullbright" : false,
+    "collidesForeground" : false,
+    "collidesLiquid" : false,
+    "ignoreWind" : true
+  }},
+  { "op" : "add", "path" : "/liquidFoamParticleVariance", "value" : {
+    "size" : 0.15,
+    "timeToLive" : 0.25,
+    "rotation" : 360,
+    "position" : [0.15, 0.1]
+  }},
+  { "op" : "add", "path" : "/liquidFoamChance", "value" : 0.6 }
+]

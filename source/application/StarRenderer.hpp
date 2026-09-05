@@ -47,15 +47,14 @@ struct RenderVertex {
   Vec2F textureCoordinate;
   Vec4B color;
   float param1;
-  // Generic secondary per-vertex vector payload, defaulted to zero so every
-  // existing call site is unaffected.  Currently used to carry liquid current
-  // direction/strength (see TilePainter::produceLiquidPrimitives) through to
-  // the world shader for the flow shimmer effect.
-  Vec2F param2 = Vec2F();
-  // Generic tertiary per-vertex scalar payload, defaulted to zero. Currently
-  // used as a boolean flag marking a liquid surface tile whose current is
-  // running into a wall, for the foam highlight in the world shader.
-  float param3 = 0.0f;
+  // Generic secondary per-vertex scalar payload, defaulted to zero so every
+  // existing call site is unaffected.  Currently used as a boolean flag
+  // marking liquid tile quads, so the world shader can apply its water
+  // wave/shine effect only to those - the effect's actual shape is a
+  // continuous function of world position and time (see world.frag), not of
+  // this flag's value, so it reads seamlessly across tile boundaries instead
+  // of looking like a patchwork of independently animated tiles.
+  float param2 = 0.0f;
 };
 
 class RenderTriangle {

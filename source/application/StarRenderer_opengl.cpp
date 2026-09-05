@@ -1096,11 +1096,7 @@ void OpenGlRenderer::GlRenderBuffer::set(List<RenderPrimitive>& primitives) {
     // it'd cause slight visual issues with sprites rotating around a point.
     glv.pack.vars.rX = min(abs(glv.pos.x() - prev.screenCoordinate.x()), abs(glv.pos.x() - next.screenCoordinate.x())) < 0.001f;
     glv.pack.vars.rY = min(abs(glv.pos.y() - prev.screenCoordinate.y()), abs(glv.pos.y() - next.screenCoordinate.y())) < 0.001f;
-    float flowSpeed = clamp(v.param2.magnitude(), 0.0f, 1.0f);
-    float flowAngleUnit = flowSpeed > 0.0f ? (v.param2.angle() + Constants::pi) / (Constants::pi * 2.0f) : 0.0f;
-    glv.pack.vars.flowAngle = (uint32_t)round(clamp(flowAngleUnit, 0.0f, 1.0f) * 255.0f);
-    glv.pack.vars.flowSpeed = (uint32_t)round(flowSpeed * 63.0f);
-    glv.pack.vars.foam = v.param3 > 0.0f;
+    glv.pack.vars.isLiquid = v.param2 > 0.0f;
     glv.pack.vars.unused = 0;
     ++currentVertexCount;
     return glv;

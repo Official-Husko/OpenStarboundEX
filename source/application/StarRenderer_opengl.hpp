@@ -132,15 +132,10 @@ private:
     uint32_t fullbright : 1;
     uint32_t rX : 1;
     uint32_t rY : 1;
-    // Quantized direction (256 steps around a circle) and strength (64 steps)
-    // of RenderVertex::param2, used by the world shader's liquid flow shimmer.
-    // Zero for anything that doesn't set param2.
-    uint32_t flowAngle : 8;
-    uint32_t flowSpeed : 6;
-    // RenderVertex::param3 > 0, used by the world shader to draw a foam
-    // highlight where a liquid surface's current runs into a wall.
-    uint32_t foam : 1;
-    uint32_t unused : 12;
+    // RenderVertex::param2 > 0, marks a liquid tile quad for the world
+    // shader's water wave/shine effect.
+    uint32_t isLiquid : 1;
+    uint32_t unused : 21;
   };
 
   struct GlRenderVertex {

@@ -15,8 +15,7 @@ flat in int fragmentTextureIndex;
 in vec4 fragmentColor;
 in float fragmentLightMapMultiplier;
 in vec2 fragmentLightMapCoordinate;
-in vec2 fragmentFlow;
-flat in float fragmentFoam;
+flat in float fragmentIsLiquid;
 
 out vec4 outColor;
 
@@ -69,20 +68,30 @@ vec3 sampleLight(vec2 coord, vec2 scale) {
 
 void main() {
   vec2 sampleCoordinate = fragmentTextureCoordinate;
+  float waterShine = 0.0;
 
-  // Flowing liquid shimmer: drift the sample point along the current's
-  // direction over time, plus a gentle perpendicular wobble whose amplitude
-  // scales with current strength, so still liquid is completely unaffected.
-  // Kept subtle - TilePainter only sets this on exposed surface tiles, so a
-  // strong wobble here would still read as a jittery seam against the calm,
-  // unshimmered tiles right next to it.
-  float flowSpeed = length(fragmentFlow);
-  if (flowSpeed > 0.0001) {
-    vec2 flowDirection = fragmentFlow / flowSpeed;
-    vec2 perpendicular = vec2(-flowDirection.y, flowDirection.x);
-    float scroll = time * flowSpeed * 0.25;
-    float wobble = sin(time * 1.4 + scroll * 4.0) * 0.12 * flowSpeed;
-    sampleCoordinate += flowDirection * scroll + perpendicular * wobble;
+  if (fragmentIsLiquid > 0.5) {
+    // Water wave/shine: purely a function of continuous world position
+    // (fragmentTextureCoordinate is proportional to world space) and time,
+    // never of any per-tile/per-vertex value. That's the whole point - it
+    // guarantees every liquid tile computes near-identical values right up
+    // to its neighbor's edge, so the whole body reads as one continuous
+    // surface instead of a patchwork of independently animated tiles.
+    vec2 p = fragmentTextureCoordinate;
+
+    // Small vertical ripple from a couple of overlapping, differently-paced
+    // waves travelling across x, plus a much smaller counter-ripple in y so
+    // it doesn't look like a single repeating wave train.
+    float ripple = sin(p.x * 0.05 + time * 0.9) * 0.6
+                 + sin(p.x * 0.13 - time * 0.6 + 1.7) * 0.4;
+    sampleCoordinate.y += ripple * 0.06;
+    sampleCoordinate.x += sin(p.y * 0.08 + time * 0.5 + 0.9) * 0.03;
+
+    // Drifting glints: product of two independent sine fields gives a
+    // patchy, semi-random-looking highlight that moves smoothly over time
+    // without ever repeating in an obviously tiled way.
+    waterShine = sin(p.x * 0.21 + time * 1.1) * sin(p.y * 0.17 - time * 0.7 + 2.1);
+    waterShine = max(waterShine, 0.0);
   }
 
   vec4 texColor;
@@ -100,16 +109,10 @@ void main() {
 
   vec4 finalColor = texColor * fragmentColor;
 
-  // Foam where a liquid surface's current runs into a wall. Blended in white
-  // regardless of the liquid's own tint (real foam looks pale even on
-  // colored/tinted liquids like lava), with a drifting mottled pattern so it
-  // doesn't read as a flat painted-on stripe, and scaled by how strong the
-  // current actually is so a bare trickle barely foams.
-  if (fragmentFoam > 0.5) {
-    float foamPattern = 0.5 + 0.5 * sin(time * 3.0 + fragmentTextureCoordinate.x * 0.35 + fragmentTextureCoordinate.y * 0.6);
-    float foamAmount = clamp(flowSpeed * 1.5, 0.0, 1.0) * (0.35 + 0.65 * foamPattern);
-    finalColor.rgb = mix(finalColor.rgb, vec3(1.0), foamAmount * 0.55);
-  }
+  // Subtle additive glint from the water shine field above. Additive (not a
+  // mix towards white) so it never looks like a flat painted-on patch, and
+  // small enough to read as a highlight rather than recoloring the water.
+  finalColor.rgb += vec3(waterShine) * 0.08;
 
   float finalLightMapMultiplier = fragmentLightMapMultiplier * lightMapMultiplier;
   if (texColor.a == 0.99607843137)
