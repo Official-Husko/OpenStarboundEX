@@ -1,0 +1,8 @@
+{
+  // How strongly the local liquid level gradient drags a body around while
+  // it's submerged (see MovementController::liquidFlowVelocity). This is
+  // liquid-agnostic - it applies to water, lava, or any modded liquid alike,
+  // since it only reacts to the generic level field every liquid uses.
+  // 0 disables currents entirely.
+  "liquidFlowFactor" : 5.0
+}

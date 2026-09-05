@@ -56,6 +56,12 @@ struct MovementParameters {
   Maybe<float> liquidFriction;
   Maybe<float> groundFriction;
 
+  // Scales the local liquid level gradient (see MovementController::liquidFlowVelocity)
+  // into a target velocity that this body is dragged towards while submerged,
+  // producing currents, waterfalls pulling things down, etc.  Defaults to 0
+  // (no current) if unset, so is safe to omit entirely.
+  Maybe<float> liquidFlowFactor;
+
   Maybe<bool> collisionEnabled;
   Maybe<bool> frictionEnabled;
   Maybe<bool> gravityEnabled;
@@ -136,6 +142,11 @@ public:
   // Returns the liquid that the body is most in, if any
   LiquidId liquidId() const;
 
+  // Approximate direction and strength of the local liquid current, derived
+  // from the liquid level gradient around the body.  Zero when not in
+  // liquid.  Blocks/second, before liquidFlowFactor is applied.
+  Vec2F liquidFlowVelocity() const;
+
   bool onGround() const;
   bool zeroG() const;
 
@@ -199,6 +210,7 @@ protected:
   // forces the movement controller onGround status, used when manually controlling movement outside the movement controller
   void updateForceRegions(float dt);
   void updateLiquidPercentage();
+  Vec2F sampleLiquidFlowVelocity(Vec2I const& center);
   void setOnGround(bool onGround);
 
   // whether force regions were applied in the last update
@@ -276,6 +288,7 @@ private:
 
   float m_liquidPercentage;
   LiquidId m_liquidId;
+  Vec2F m_liquidFlowVelocity;
 
   NetElementData<Maybe<MovingCollisionId>> m_surfaceMovingCollision;
   NetElementFloat m_xRelativeSurfaceMovingCollisionPosition;

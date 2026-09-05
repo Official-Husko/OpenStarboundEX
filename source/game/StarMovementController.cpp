@@ -34,6 +34,7 @@ MovementParameters::MovementParameters(Json const& config) {
   airFriction = config.optFloat("airFriction");
   liquidFriction = config.optFloat("liquidFriction");
   groundFriction = config.optFloat("groundFriction");
+  liquidFlowFactor = config.optFloat("liquidFlowFactor");
   collisionEnabled = config.optBool("collisionEnabled");
   frictionEnabled = config.optBool("frictionEnabled");
   gravityEnabled = config.optBool("gravityEnabled");
@@ -65,6 +66,7 @@ MovementParameters MovementParameters::merge(MovementParameters const& rhs) cons
   merged.airFriction = rhs.airFriction.orMaybe(airFriction);
   merged.liquidFriction = rhs.liquidFriction.orMaybe(liquidFriction);
   merged.groundFriction = rhs.groundFriction.orMaybe(groundFriction);
+  merged.liquidFlowFactor = rhs.liquidFlowFactor.orMaybe(liquidFlowFactor);
   merged.collisionEnabled = rhs.collisionEnabled.orMaybe(collisionEnabled);
   merged.frictionEnabled = rhs.frictionEnabled.orMaybe(frictionEnabled);
   merged.gravityEnabled = rhs.gravityEnabled.orMaybe(gravityEnabled);
@@ -96,6 +98,7 @@ Json MovementParameters::toJson() const {
     {"airFriction", jsonFromMaybe(airFriction)},
     {"liquidFriction", jsonFromMaybe(liquidFriction)},
     {"groundFriction", jsonFromMaybe(groundFriction)},
+    {"liquidFlowFactor", jsonFromMaybe(liquidFlowFactor)},
     {"collisionEnabled", jsonFromMaybe(collisionEnabled)},
     {"frictionEnabled", jsonFromMaybe(frictionEnabled)},
     {"gravityEnabled", jsonFromMaybe(gravityEnabled)},
@@ -125,6 +128,7 @@ DataStream& operator>>(DataStream& ds, MovementParameters& movementParameters) {
   ds.read(movementParameters.airFriction);
   ds.read(movementParameters.liquidFriction);
   ds.read(movementParameters.groundFriction);
+  ds.read(movementParameters.liquidFlowFactor);
   ds.read(movementParameters.collisionEnabled);
   ds.read(movementParameters.frictionEnabled);
   ds.read(movementParameters.gravityEnabled);
@@ -155,6 +159,7 @@ DataStream& operator<<(DataStream& ds, MovementParameters const& movementParamet
   ds.write(movementParameters.airFriction);
   ds.write(movementParameters.liquidFriction);
   ds.write(movementParameters.groundFriction);
+  ds.write(movementParameters.liquidFlowFactor);
   ds.write(movementParameters.collisionEnabled);
   ds.write(movementParameters.frictionEnabled);
   ds.write(movementParameters.gravityEnabled);
@@ -174,6 +179,7 @@ MovementController::MovementController(MovementParameters const& parameters) {
 
   m_liquidPercentage = 0.0f;
   m_liquidId = EmptyLiquidId;
+  m_liquidFlowVelocity = Vec2F();
 
   m_xPosition.setFixedPointBase(0.0125f);
   m_yPosition.setFixedPointBase(0.0125f);
@@ -317,6 +323,10 @@ float MovementController::liquidPercentage() const {
 
 LiquidId MovementController::liquidId() const {
   return m_liquidId;
+}
+
+Vec2F MovementController::liquidFlowVelocity() const {
+  return m_liquidFlowVelocity;
 }
 
 bool MovementController::onGround() const {
@@ -679,6 +689,11 @@ void MovementController::tickMaster(float dt) {
     if (onGround()) {
       friction = max(friction, *m_parameters.groundFriction);
       refVel = m_surfaceVelocity;
+    } else if (m_liquidPercentage > 0.0f) {
+      // Drag the body towards the local current's velocity rather than
+      // accelerating it outright, so it settles at the current's speed
+      // instead of building up velocity forever near strong gradients.
+      refVel = m_liquidFlowVelocity * m_parameters.liquidFlowFactor.value(0.0f);
     }
 
     // The equation for friction here is effectively:
@@ -709,6 +724,7 @@ void MovementController::tickSlave(float dt) {
   LiquidLevel cll = world()->liquidLevel(collisionBody().boundBox());
   m_liquidPercentage = clamp(cll.level, 0.0f, 1.0f);
   m_liquidId = cll.liquid;
+  m_liquidFlowVelocity = m_liquidPercentage > 0.0f ? sampleLiquidFlowVelocity(Vec2I::floor(position())) : Vec2F();
 }
 
 void MovementController::setIgnorePhysicsEntities(Set<EntityId> ignorePhysicsEntities) {
@@ -818,6 +834,20 @@ void MovementController::updateLiquidPercentage() {
 
   m_liquidPercentage = clamp(cll.level, 0.0f, 1.0f);
   m_liquidId = cll.liquid;
+  m_liquidFlowVelocity = m_liquidPercentage > 0.0f ? sampleLiquidFlowVelocity(Vec2I::floor(pos)) : Vec2F();
+}
+
+Vec2F MovementController::sampleLiquidFlowVelocity(Vec2I const& center) {
+  // Liquid tends to move from tiles with a higher level/pressure towards
+  // tiles with a lower one (see LiquidCellEngine's pressure and lateral
+  // move steps), so the negative gradient of the level field is a
+  // reasonable stand-in for the local current direction and strength,
+  // without needing to touch the simulation or network protocol at all.
+  auto sample = [this, &center](Vec2I const& offset) {
+    return clamp(world()->liquidLevel(center + offset).level, 0.0f, 2.0f);
+  };
+
+  return Vec2F(sample(Vec2I(-1, 0)) - sample(Vec2I(1, 0)), sample(Vec2I(0, -1)) - sample(Vec2I(0, 1)));
 }
 
 void MovementController::setOnGround(bool onGround) {
