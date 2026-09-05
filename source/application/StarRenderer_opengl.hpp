@@ -137,7 +137,10 @@ private:
     // Zero for anything that doesn't set param2.
     uint32_t flowAngle : 8;
     uint32_t flowSpeed : 6;
-    uint32_t unused : 13;
+    // RenderVertex::param3 > 0, used by the world shader to draw a foam
+    // highlight where a liquid surface's current runs into a wall.
+    uint32_t foam : 1;
+    uint32_t unused : 12;
   };
 
   struct GlRenderVertex {

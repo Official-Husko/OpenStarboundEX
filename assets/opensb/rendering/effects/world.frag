@@ -16,6 +16,7 @@ in vec4 fragmentColor;
 in float fragmentLightMapMultiplier;
 in vec2 fragmentLightMapCoordinate;
 in vec2 fragmentFlow;
+flat in float fragmentFoam;
 
 out vec4 outColor;
 
@@ -70,14 +71,17 @@ void main() {
   vec2 sampleCoordinate = fragmentTextureCoordinate;
 
   // Flowing liquid shimmer: drift the sample point along the current's
-  // direction over time, plus a perpendicular wobble whose amplitude scales
-  // with current strength, so still liquid is completely unaffected.
+  // direction over time, plus a gentle perpendicular wobble whose amplitude
+  // scales with current strength, so still liquid is completely unaffected.
+  // Kept subtle - TilePainter only sets this on exposed surface tiles, so a
+  // strong wobble here would still read as a jittery seam against the calm,
+  // unshimmered tiles right next to it.
   float flowSpeed = length(fragmentFlow);
   if (flowSpeed > 0.0001) {
     vec2 flowDirection = fragmentFlow / flowSpeed;
     vec2 perpendicular = vec2(-flowDirection.y, flowDirection.x);
-    float scroll = time * flowSpeed * 0.4;
-    float wobble = sin(time * 2.2 + scroll * 6.0) * 0.4 * flowSpeed;
+    float scroll = time * flowSpeed * 0.25;
+    float wobble = sin(time * 1.4 + scroll * 4.0) * 0.12 * flowSpeed;
     sampleCoordinate += flowDirection * scroll + perpendicular * wobble;
   }
 
@@ -95,6 +99,18 @@ void main() {
     discard;
 
   vec4 finalColor = texColor * fragmentColor;
+
+  // Foam where a liquid surface's current runs into a wall. Blended in white
+  // regardless of the liquid's own tint (real foam looks pale even on
+  // colored/tinted liquids like lava), with a drifting mottled pattern so it
+  // doesn't read as a flat painted-on stripe, and scaled by how strong the
+  // current actually is so a bare trickle barely foams.
+  if (fragmentFoam > 0.5) {
+    float foamPattern = 0.5 + 0.5 * sin(time * 3.0 + fragmentTextureCoordinate.x * 0.35 + fragmentTextureCoordinate.y * 0.6);
+    float foamAmount = clamp(flowSpeed * 1.5, 0.0, 1.0) * (0.35 + 0.65 * foamPattern);
+    finalColor.rgb = mix(finalColor.rgb, vec3(1.0), foamAmount * 0.55);
+  }
+
   float finalLightMapMultiplier = fragmentLightMapMultiplier * lightMapMultiplier;
   if (texColor.a == 0.99607843137)
     finalColor.a = fragmentColor.a;

@@ -386,18 +386,48 @@ void TilePainter::produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive
   // world.frag, derived the same way as the gameplay current in
   // MovementController::sampleLiquidFlowVelocity: liquid tends to move from
   // tiles with a higher level towards tiles with a lower one.
+  //
+  // Only the exposed surface of a liquid body shimmers - fully submerged
+  // tiles are left completely still (flow left at zero). Computing this
+  // per-tile independently over the *whole* body made every tile boundary a
+  // visible seam once each tile started scrolling its texture at its own
+  // slightly different rate; restricting it to the surface cuts that down to
+  // one row, and also just matches how real water actually reads (ripples up
+  // top, calm below).
   auto neighborLevel = [&](Vec2I const& offset) {
     return byteToFloat(getRenderTile(renderData, pos + offset).liquidLevel);
   };
-  Vec2F flow(neighborLevel(Vec2I(-1, 0)) - neighborLevel(Vec2I(1, 0)),
-             neighborLevel(Vec2I(0, -1)) - neighborLevel(Vec2I(0, 1)));
+
+  Vec2F flow;
+  bool foam = false;
+  float aboveLevel = neighborLevel(Vec2I(0, 1));
+  if (drawLevel < 1.0f || aboveLevel < 0.95f) {
+    // Average a small horizontal window of gradients rather than just the
+    // immediate left/right neighbors, so adjacent tiles' flow vectors stay
+    // close to each other instead of jumping at tile boundaries.
+    float left2 = neighborLevel(Vec2I(-2, 0));
+    float left1 = neighborLevel(Vec2I(-1, 0));
+    float right1 = neighborLevel(Vec2I(1, 0));
+    float right2 = neighborLevel(Vec2I(2, 0));
+    float belowLevel = neighborLevel(Vec2I(0, -1));
+
+    float flowX = ((left1 - right1) * 2.0f + (left2 - right2)) / 4.0f;
+    float flowY = belowLevel - aboveLevel;
+    flow = Vec2F(flowX, flowY);
+
+    // Foam where the surface current is running straight into a wall.
+    Vec2I towards(flowX > 0.05f ? 1 : (flowX < -0.05f ? -1 : 0), 0);
+    if (towards[0] != 0)
+      foam = getRenderTile(renderData, pos + towards).foreground != EmptyMaterialId;
+  }
 
   auto const& liquid = m_liquids[tile.liquidId];
+  float foamParam = foam ? 1.0f : 0.0f;
 
-  RenderVertex vA{worldRect.min(), texRect.min(), liquid.color, 1.0f, flow};
-  RenderVertex vB{Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()), liquid.color, 1.0f, flow};
-  RenderVertex vC{worldRect.max(), texRect.max(), liquid.color, 1.0f, flow};
-  RenderVertex vD{Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()), liquid.color, 1.0f, flow};
+  RenderVertex vA{worldRect.min(), texRect.min(), liquid.color, 1.0f, flow, foamParam};
+  RenderVertex vB{Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()), liquid.color, 1.0f, flow, foamParam};
+  RenderVertex vC{worldRect.max(), texRect.max(), liquid.color, 1.0f, flow, foamParam};
+  RenderVertex vD{Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()), liquid.color, 1.0f, flow, foamParam};
 
   primitives[tile.liquidId].emplace_back(std::in_place_type_t<RenderQuad>(), liquid.texture, vA, vB, vC, vD);
 }

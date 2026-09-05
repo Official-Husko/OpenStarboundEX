@@ -1100,6 +1100,7 @@ void OpenGlRenderer::GlRenderBuffer::set(List<RenderPrimitive>& primitives) {
     float flowAngleUnit = flowSpeed > 0.0f ? (v.param2.angle() + Constants::pi) / (Constants::pi * 2.0f) : 0.0f;
     glv.pack.vars.flowAngle = (uint32_t)round(clamp(flowAngleUnit, 0.0f, 1.0f) * 255.0f);
     glv.pack.vars.flowSpeed = (uint32_t)round(flowSpeed * 63.0f);
+    glv.pack.vars.foam = v.param3 > 0.0f;
     glv.pack.vars.unused = 0;
     ++currentVertexCount;
     return glv;

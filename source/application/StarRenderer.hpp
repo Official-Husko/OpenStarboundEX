@@ -52,6 +52,10 @@ struct RenderVertex {
   // direction/strength (see TilePainter::produceLiquidPrimitives) through to
   // the world shader for the flow shimmer effect.
   Vec2F param2 = Vec2F();
+  // Generic tertiary per-vertex scalar payload, defaulted to zero. Currently
+  // used as a boolean flag marking a liquid surface tile whose current is
+  // running into a wall, for the foam highlight in the world shader.
+  float param3 = 0.0f;
 };
 
 class RenderTriangle {
