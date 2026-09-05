@@ -120,6 +120,7 @@ jobs:
         with:
           name: OpenStarbound-Windows-All-DevOnly
           path: OpenStarbound-Windows-All-DevOnly.zip
+          retention-days: 1
           archive: false
 
       - name: Upload Client
@@ -127,6 +128,7 @@ jobs:
         with:
           name: OpenStarbound-Windows-Client
           path: OpenStarbound-Windows-Client.zip
+          retention-days: 1
           archive: false
 
       - name: Upload Server
@@ -135,7 +137,8 @@ jobs:
           name: OpenStarbound-Windows-Server
           path: OpenStarbound-Windows-Server.zip
           archive: false
-          
+          retention-days: 1
+
       - name: Install Inno Setup
         run: |
           echo "Checking pre-installation..."
@@ -177,6 +180,7 @@ jobs:
           path: installer/OpenStarbound-Windows-Installer.exe
           archive: true
           compression-level: 0
+          retention-days: 1
   
   build_linux:
     name: Build OpenStarbound Linux x86_64
@@ -242,6 +246,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-GCC
           path: OpenStarbound-Linux-GCC.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Run Tests
@@ -265,6 +270,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-GCC-Client
           path: OpenStarbound-Linux-GCC-Client.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Upload Server Files
@@ -272,6 +278,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-GCC-Server
           path: OpenStarbound-Linux-GCC-Server.tar.lz
+          retention-days: 1
           archive: false
 
   build_linux_clang:
@@ -346,6 +353,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-Clang
           path: OpenStarbound-Linux-Clang.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Run Tests
@@ -369,6 +377,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-Clang-Client
           path: OpenStarbound-Linux-Clang-Client.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Upload Server Files
@@ -376,6 +385,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-Clang-Server
           path: OpenStarbound-Linux-Clang-Server.tar.lz
+          retention-days: 1
           archive: false
   
   build_linux_arm:
@@ -442,6 +452,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-ARM-GCC
           path: OpenStarbound-Linux-ARM-GCC.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Run Tests
@@ -465,6 +476,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-ARM-GCC-Client
           path: OpenStarbound-Linux-ARM-GCC-Client.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Upload Server Files
@@ -472,6 +484,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-ARM-GCC-Server
           path: OpenStarbound-Linux-ARM-GCC-Server.tar.lz
+          retention-days: 1
           archive: false
 
   build_linux_arm_clang:
@@ -541,6 +554,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-ARM-Clang
           path: OpenStarbound-Linux-ARM-Clang.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Run Tests
@@ -564,6 +578,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-ARM-Clang-Client
           path: OpenStarbound-Linux-ARM-Clang-Client.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Upload Server Files
@@ -571,6 +586,7 @@ jobs:
         with:
           name: OpenStarbound-Linux-ARM-Clang-Server
           path: OpenStarbound-Linux-ARM-Clang-Server.tar.lz
+          retention-days: 1
           archive: false
 
   build-mac-intel:
@@ -642,6 +658,7 @@ jobs:
         with:
           name: OpenStarbound-macOS-Intel
           path: OpenStarbound-macOS-Intel.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Assemble Files
@@ -655,6 +672,7 @@ jobs:
         with:
           name: OpenStarbound-macOS-Intel-Client
           path: OpenStarbound-macOS-Intel-Client.tar.lz
+          retention-days: 1
           archive: false
 
   build-mac-arm:
@@ -726,6 +744,7 @@ jobs:
         with:
           name: OpenStarbound-macOS-Silicon
           path: OpenStarbound-macOS-Silicon.tar.lz
+          retention-days: 1
           archive: false
 
       - name: Assemble Files
@@ -739,4 +758,5 @@ jobs:
         with:
           name: OpenStarbound-macOS-Silicon-Client
           path: OpenStarbound-macOS-Silicon-Client.tar.lz
+          retention-days: 1
           archive: false
