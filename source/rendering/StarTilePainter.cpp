@@ -393,10 +393,31 @@ void TilePainter::produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive
   // boundaries instead of looking like a patchwork of independently
   // animated tiles.
   float scroll = liquid.textureMovementFactor;
-  RenderVertex vA{worldRect.min(), texRect.min(), liquid.color, 1.0f, scroll};
-  RenderVertex vB{Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()), liquid.color, 1.0f, scroll};
-  RenderVertex vC{worldRect.max(), texRect.max(), liquid.color, 1.0f, scroll};
-  RenderVertex vD{Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()), liquid.color, 1.0f, scroll};
+
+  // Shoreline foam intensity: fades in near where an exposed liquid surface
+  // meets a solid wall, falling off smoothly over a couple of tiles rather
+  // than cutting off hard at one tile's edge. This only marks *where* foam
+  // should appear - the actual foam texture is a noise pattern computed in
+  // the shader (see world.frag), not a flat tint, and it never spawns any
+  // entity/particle, so nothing ever leaves the water's surface.
+  float foamIntensity = 0.0f;
+  float aboveLevel = byteToFloat(getRenderTile(renderData, pos + Vec2I(0, 1)).liquidLevel);
+  bool isSurface = drawLevel < 1.0f || aboveLevel < 0.95f;
+  if (isSurface) {
+    for (int d = 0; d <= 2; ++d) {
+      bool wallLeft = getRenderTile(renderData, pos + Vec2I(-(d + 1), 0)).foreground != EmptyMaterialId;
+      bool wallRight = getRenderTile(renderData, pos + Vec2I(d + 1, 0)).foreground != EmptyMaterialId;
+      if (wallLeft || wallRight) {
+        foamIntensity = max(foamIntensity, 1.0f - d * 0.4f);
+        break;
+      }
+    }
+  }
+
+  RenderVertex vA{worldRect.min(), texRect.min(), liquid.color, 1.0f, scroll, foamIntensity};
+  RenderVertex vB{Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()), liquid.color, 1.0f, scroll, foamIntensity};
+  RenderVertex vC{worldRect.max(), texRect.max(), liquid.color, 1.0f, scroll, foamIntensity};
+  RenderVertex vD{Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()), liquid.color, 1.0f, scroll, foamIntensity};
 
   primitives[tile.liquidId].emplace_back(std::in_place_type_t<RenderQuad>(), liquid.texture, vA, vB, vC, vD);
 }

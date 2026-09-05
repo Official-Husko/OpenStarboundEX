@@ -25,42 +25,10 @@
   { "op" : "add", "path" : "/subWorldScriptContexts", "value" : {} },
 
   { "op" : "add", "path" : "/idleSubWorldExpireTime", "value" : 10.0 },
-  { "op" : "add", "path" : "/subWorldUpdateMeasureWindow", "value" : 0.5 },
+  { "op" : "add", "path" : "/subWorldUpdateMeasureWindow", "value" : 0.5 }
 
-  // Ambient foam particles where a flowing liquid surface hits a wall (see
-  // WorldClient::spawnLiquidFoamParticles). velocity here is only used for
-  // its magnitude - the actual direction is computed per-particle, away
-  // from whichever wall it's foaming against.
-  //
-  // First attempt reused /particles/splash/1.png - a tiny star/spark icon
-  // meant for a raindrop's impact instant, read as "sparks shooting out" in
-  // game. Second attempt reused the gas-cloud puff animation tinted white -
-  // but that sprite is *already colored blue in its own pixels*, and a
-  // white color tint is multiplicative (color * pixel), so tinting it white
-  // is a no-op on hue - it just stayed blue smoke. Using the fog weather
-  // puff instead (/animations/fog/fog.animation): confirmed by actually
-  // inspecting its pixels that it's genuinely white/pale with soft alpha,
-  // so a white tint here actually does something, and it fades out via
-  // "destructionAction":"Fade" instead of just cutting off mid-animation.
-  { "op" : "add", "path" : "/liquidFoamParticle", "value" : {
-    "type" : "animated",
-    "animation" : "/animations/fog/fog.animation",
-    "size" : 0.5,
-    "color" : [255, 255, 255, 210],
-    "velocity" : [1.0, 0.4],
-    "timeToLive" : 1.1,
-    "destructionAction" : "Fade",
-    "layer" : "middle",
-    "fullbright" : false,
-    "collidesForeground" : false,
-    "collidesLiquid" : false,
-    "ignoreWind" : true
-  }},
-  { "op" : "add", "path" : "/liquidFoamParticleVariance", "value" : {
-    "size" : 0.15,
-    "timeToLive" : 0.3,
-    "rotation" : 360,
-    "position" : [0.15, 0.1]
-  }},
-  { "op" : "add", "path" : "/liquidFoamChance", "value" : 0.6 }
+  // Liquid foam used to be an ambient particle system here (liquidFoamParticle
+  // etc.) - pulled after it kept reading as particles "shooting into the air"
+  // regardless of sprite. Foam is now a shader-side noise layer instead, see
+  // world.frag / StarTilePainter.cpp - it never leaves the water surface.
 ]

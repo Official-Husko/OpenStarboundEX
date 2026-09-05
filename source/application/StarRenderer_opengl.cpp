@@ -1097,6 +1097,7 @@ void OpenGlRenderer::GlRenderBuffer::set(List<RenderPrimitive>& primitives) {
     glv.pack.vars.rX = min(abs(glv.pos.x() - prev.screenCoordinate.x()), abs(glv.pos.x() - next.screenCoordinate.x())) < 0.001f;
     glv.pack.vars.rY = min(abs(glv.pos.y() - prev.screenCoordinate.y()), abs(glv.pos.y() - next.screenCoordinate.y())) < 0.001f;
     glv.pack.vars.liquidScrollSpeed = (uint32_t)round(clamp(v.param2 / 8.0f, 0.0f, 1.0f) * 255.0f);
+    glv.pack.vars.foamIntensity = (uint32_t)round(clamp(v.param3, 0.0f, 1.0f) * 255.0f);
     glv.pack.vars.unused = 0;
     ++currentVertexCount;
     return glv;

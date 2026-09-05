@@ -36,22 +36,21 @@ what could come next. See `CLAUDE.md` for the technical orientation.
   `source/application/StarRenderer_opengl.{hpp,cpp}` (packs the quantized value into
   previously-`unused` bits of the per-vertex integer attribute - no new vertex attributes, no new
   shader effect).
-- **Wall foam, as particles.** A shader-tint version of this (blending liquid tiles towards white)
-  looked bad - flat, tile-aligned, and it recolored the actual water. Replaced with real ambient
-  particles: where a flowing surface tile's level gradient points straight into a solid wall,
-  there's a chance each tick to spawn a particle drifting away from the wall. Went through two
-  wrong sprites before landing on a right one: `/particles/splash/1.png` turned out to be a tiny
-  star/spark icon for a raindrop's impact instant ("sparks shooting out" in-game); the gas-cloud
-  puff animation looked right in isolation but is *colored blue in its own pixels*, so a white
-  color tint (multiplicative) couldn't change its hue and it just stayed blue smoke. Landed on the
-  fog weather puff (`/animations/fog/fog.animation`), confirmed by actually inspecting its pixel
-  data to be genuinely white/pale with soft alpha, so tinting it actually does something; fades
-  out via `destructionAction: "Fade"` instead of cutting off mid-animation. Purely cosmetic,
-  client-side only, scanned each tick over the visible tile region (bounded, cheap - same cost
-  class as weather's own particle spawning). `WorldClient::spawnLiquidFoamParticles` in
-  `source/game/StarWorldClient.cpp`, tuned via
-  `liquidFoamParticle`/`liquidFoamParticleVariance`/`liquidFoamChance` in
-  `assets/opensb/client.config.patch`.
+- **Shoreline foam, as a shader noise layer.** Went through two wrong approaches before this one.
+  v1 blended whole liquid tiles towards white - flat, tile-aligned, recolored the actual water.
+  v2 was an ambient particle system spawning sprites that drifted off the water with real
+  velocity - read as "stuff shooting/blowing into the air" regardless of which sprite was tried
+  (a star/spark icon, then a gas-cloud puff that turned out to be un-tintable since it's colored
+  blue in its own pixels, not white). Current version is neither: a per-vertex "how close is this
+  tile to a wall" intensity (`RenderVertex::param3`, fading smoothly over ~3 tiles, computed in
+  `TilePainter::produceLiquidPrimitives`) gates a procedural noise pattern computed entirely in
+  `world.frag` from world position + time - thresholded into bubble-like clusters rather than a
+  smooth gradient, slowly drifting so it doesn't look like a static decal. Nothing is spawned,
+  nothing has velocity, nothing leaves the water's surface - it's a layer on the water, not an
+  object in the world. `source/rendering/StarTilePainter.cpp`,
+  `assets/opensb/rendering/effects/world.{vert,frag}`, `source/application/StarRenderer_opengl.{hpp,cpp}`
+  (packs the quantized intensity into more of the same previously-`unused` bits the wave/shine
+  value uses).
 
 `assets/opensb/client.config.patch` also turned up a second, more general instance of an
 engine-level JSON patch bug — see `BUGS.md` — worth reading before writing any more
@@ -70,16 +69,20 @@ file, not this one.
   intended unit is still unknown (never consumed by any code before this pass, so there's nothing
   to cross-check against) - "produces visible, non-mechanical-looking motion at a reasonable
   speed" is the current bar, not "matches original intent."
-- Foam currently only triggers on horizontal wall collisions; waterfalls hitting a floor
-  (vertical collision) could get the same treatment.
-- Foam particle timing (`timeToLive: 1.1`) is a guess at roughly matching the fog animation's own
-  cycle length (2.0s per `fog.animation`, but see it as a loop - the particle is meant to cut in
-  partway through) - worth checking it actually looks like a foam pop and not a truncated fog puff.
+- Foam currently only appears near *any* wall a surface tile is adjacent to (shoreline-style), not
+  specifically where a current is flowing into one - simpler and matches "foam along a pond's
+  edge" better, but means it no longer conveys current strength/direction the way the old
+  particle version's spawn rate did. Could reintroduce that as a secondary intensity factor later.
+- The noise scale (`* 4.0`), threshold (`smoothstep(0.48, 0.7, ...)`), drift speed, and opacity
+  (`* 0.85`) in `world.frag` are first-guess values for "looks like clusters of foam" - not tuned
+  against an actual screenshot.
+- Foam only fades in near horizontal walls; waterfalls hitting a floor (vertical collision) don't
+  currently get any.
 - Several rendering bugs have shipped and gone unnoticed until actually seen in-game (invisible
-  ripple, star-shaped "foam", blue "white" foam, a too-fast/too-linear wave). All were caught by
-  the user playing a real build, not by compiling cleanly or reasoning about the code - there's no
-  way to render a frame or view a running client from here, so treat anything visual in this file
-  as unverified until someone's actually looked at it. Static inspection (unpacking and viewing
-  the actual sprite/texture pixels, as opposed to assuming from a filename) has caught real bugs
-  before they even reached the user, though - worth doing by default for anything visual, not just
-  after a report.
+  ripple, star-shaped "foam", blue "white" foam, a too-fast/too-linear wave, particles reading as
+  "blowing into the air"). All were caught by the user playing a real build, not by compiling
+  cleanly or reasoning about the code - there's no way to render a frame or view a running client
+  from here, so treat anything visual in this file as unverified until someone's actually looked
+  at it. Static inspection (unpacking and viewing the actual sprite/texture pixels, as opposed to
+  assuming from a filename) has caught real bugs before they even reached the user, though - worth
+  doing by default for anything visual, not just after a report.

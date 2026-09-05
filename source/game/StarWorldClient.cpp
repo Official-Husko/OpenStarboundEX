@@ -82,10 +82,6 @@ WorldClient::WorldClient(PlayerPtr mainPlayer, LuaRootPtr luaRoot) {
   m_blockDingParticleVariance = Particle(m_clientConfig.getObject("blockDingParticleVariance"));
   m_blockDingParticleProbability = m_clientConfig.getFloat("blockDingParticleProbability");
 
-  m_liquidFoamParticle = Particle(m_clientConfig.getObject("liquidFoamParticle"));
-  m_liquidFoamParticleVariance = Particle(m_clientConfig.getObject("liquidFoamParticleVariance"));
-  m_liquidFoamChance = m_clientConfig.getFloat("liquidFoamChance");
-
   m_damageNotificationBatchDuration = m_clientConfig.getFloat("damageNotificationBatchDuration");
 
   m_ambientSounds.setTrackFadeInTime(assets->json("/interface.config:ambientTrackFadeInTime").toFloat());
@@ -1361,7 +1357,6 @@ void WorldClient::update(float dt) {
     sparkDamagedBlocks();
 
     m_particles->addParticles(m_weather.pullNewParticles());
-    m_particles->addParticles(spawnLiquidFoamParticles(RectF(particleRegion), dt));
     m_particles->update(dt, RectF(particleRegion), m_weather.wind());
 
     if (auto audioSample = m_ambientSounds.updateAmbient(currentAmbientNoises(), m_sky->isDayTime()))
@@ -1783,54 +1778,6 @@ void WorldClient::sparkDamagedBlocks() {
       }
     }
   }
-}
-
-List<Particle> WorldClient::spawnLiquidFoamParticles(RectF const& region, float dt) {
-  List<Particle> particles;
-  if (!m_tileArray || m_liquidFoamChance <= 0.0f)
-    return particles;
-
-  auto sampleLevel = [this](Vec2I const& pos) -> float {
-    return m_tileArray->tile(pos).liquid.level;
-  };
-
-  RectI tileRegion = RectI::integral(region);
-  for (int x = tileRegion.xMin(); x < tileRegion.xMax(); ++x) {
-    for (int y = tileRegion.yMin(); y < tileRegion.yMax(); ++y) {
-      Vec2I pos(x, y);
-      float level = sampleLevel(pos);
-      if (level <= 0.0f)
-        continue;
-
-      // Only the exposed surface of a liquid body foams.
-      float above = sampleLevel(pos + Vec2I(0, 1));
-      if (above >= 0.95f)
-        continue;
-
-      // Only where that surface has a real slope, i.e. is actually flowing
-      // rather than sitting level.
-      float flowX = sampleLevel(pos + Vec2I(-1, 0)) - sampleLevel(pos + Vec2I(1, 0));
-      if (fabs(flowX) < 0.15f)
-        continue;
-
-      // ...and only where it's running straight into a wall.
-      Vec2I towards(flowX > 0.0f ? 1 : -1, 0);
-      if (!isSolidColliding(m_tileArray->tile(pos + towards).getCollision()))
-        continue;
-
-      float chance = m_liquidFoamChance * clamp(fabs(flowX), 0.0f, 1.0f) * dt;
-      if (Random::randf() >= chance)
-        continue;
-
-      Particle particle = m_liquidFoamParticle;
-      particle.position = centerOfTile(pos) + Vec2F(towards[0] * 0.4f, level - 0.5f);
-      particle.velocity = particle.velocity.magnitude() * vnorm(Vec2F(-towards[0], 0.6f));
-      particle.applyVariance(m_liquidFoamParticleVariance);
-      particles.append(std::move(particle));
-    }
-  }
-
-  return particles;
 }
 
 InteractiveEntityPtr WorldClient::getInteractiveInRange(Vec2F const& targetPosition, Vec2F const& sourcePosition, float maxRange) const {

@@ -251,10 +251,6 @@ private:
 
   void sparkDamagedBlocks();
 
-  // Ambient foam particles where a flowing liquid surface hits a wall.
-  // Purely cosmetic, client-side only.
-  List<Particle> spawnLiquidFoamParticles(RectF const& region, float dt);
-
   Vec2I environmentBiomeTrackPosition() const;
   AmbientNoisesDescriptionPtr currentAmbientNoises() const;
   WeatherNoisesDescriptionPtr currentWeatherNoises() const;
@@ -374,10 +370,6 @@ private:
   Particle m_blockDingParticle;
   Particle m_blockDingParticleVariance;
   float m_blockDingParticleProbability;
-
-  Particle m_liquidFoamParticle;
-  Particle m_liquidFoamParticleVariance;
-  float m_liquidFoamChance;
 
   HashSet<Vec2I> m_damagedBlocks;
 
