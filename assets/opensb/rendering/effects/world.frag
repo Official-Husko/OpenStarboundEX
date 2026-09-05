@@ -78,16 +78,24 @@ void main() {
     // given liquid, so every tile scrolls in lockstep with its neighbors -
     // no seams, no patchwork.
     //
-    // fragmentTextureCoordinate is in texture-widths (normalized by the
-    // liquid texture's own pixel size), so this scroll speed is directly in
-    // "texture repeats per second" - visibly sweeping the gradient bands
-    // across the whole body.
-    sampleCoordinate.x += fragmentLiquidScrollSpeed * time * 0.15;
+    // A pure linear scroll alone looks like a conveyor belt - too even and
+    // predictable. Real displacement instead: sample-point offset built
+    // from several sine terms at different, deliberately non-matching
+    // frequencies and speeds in both axes, so no two points on the surface
+    // are ever moving the exact same way at the exact same time. Still
+    // fully seamless (every input is fragmentTextureCoordinate/time, never
+    // a per-tile value).
+    vec2 p = fragmentTextureCoordinate;
+    float speed = fragmentLiquidScrollSpeed * 0.045;
 
-    // A gentle vertical wave on top, so it doesn't read as pure horizontal
-    // scrolling. Wavelength/speed deliberately different from the scroll so
-    // the two don't visually lock together.
-    sampleCoordinate.y += sin(fragmentTextureCoordinate.x * 0.35 + time * 0.8) * 0.12;
+    float dx = sin(p.y * 0.6 + time * speed * 1.3) * 0.30
+             + sin(p.y * 1.7 - time * speed * 0.6 + 2.0) * 0.15
+             + time * speed * 0.5;
+    float dy = sin(p.x * 0.4 - time * speed * 0.9 + 1.1) * 0.18
+             + sin(p.x * 1.1 + time * speed * 1.7 + 3.0) * 0.09;
+
+    sampleCoordinate.x += dx;
+    sampleCoordinate.y += dy;
   }
 
   vec4 texColor;
