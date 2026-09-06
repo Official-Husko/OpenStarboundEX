@@ -282,9 +282,11 @@ public:
   void setWeatherIndex(size_t weatherIndex, bool force = false);
   // Force the current weather to a specific weather type by name
   void setWeather(String const& weatherName, bool force = false);
+  void setWeather(Vec2F const& position, String const& weatherName, bool force = false);
 
   // Returns the list of weather names available in this world
   StringList weatherList() const;
+  StringList weatherList(Vec2F const& position) const;
 
   // used to notify the universe server that the celestial planet type has changed
   Maybe<pair<String, String>> pullNewPlanetType();
@@ -301,6 +303,7 @@ private:
     ClientSubWorldId subWorldId;
     uint64_t skyNetVersion;
     uint64_t weatherNetVersion;
+    Maybe<String> weatherDomain;
     WorldClientState clientState;
     bool pendingForward;
     bool started;
@@ -363,6 +366,10 @@ private:
   bool isFloatingDungeonWorld() const;
 
   void setupForceRegions();
+  void setupWeatherDomains(bool preserveNonSurface = false);
+  ServerWeatherPtr weatherForDomain(Maybe<String> const& domain) const;
+  ServerWeatherPtr weatherAt(Vec2F const& position) const;
+  ServerWeatherPtr surfaceWeather() const;
 
   Json m_serverConfig;
 
@@ -398,7 +405,8 @@ private:
   mutable CellularLightIntensityCalculator m_lightIntensityCalculator;
   SkyPtr m_sky;
 
-  ServerWeather m_weather;
+  StringMap<ServerWeatherPtr> m_weatherDomains;
+  ServerWeatherPtr m_emptyWeather;
 
   ClockPtr m_referenceClock;
 

@@ -327,6 +327,16 @@ void ClientWeather::readUpdate(ByteArray data, NetCompatibilityRules rules) {
   }
 }
 
+void ClientWeather::clear() {
+  m_currentWeatherIndex = NPos;
+  m_currentWeatherType.reset();
+  m_currentWeatherIntensity = 0.0f;
+  m_currentWind = 0.0f;
+  m_visibleRegion = {};
+  m_particles.clear();
+  m_lastParticleVisibleRegion = {};
+}
+
 void ClientWeather::setVisibleRegion(RectI visibleRegion) {
   m_visibleRegion = visibleRegion;
 }
@@ -368,6 +378,12 @@ List<Particle> ClientWeather::pullNewParticles() {
 StringList ClientWeather::weatherTrackOptions() const {
   if (m_currentWeatherType)
     return m_currentWeatherType->weatherNoises;
+  return {};
+}
+
+Maybe<String> ClientWeather::weatherParallax() const {
+  if (m_currentWeatherType)
+    return m_currentWeatherType->parallax;
   return {};
 }
 

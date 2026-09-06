@@ -252,6 +252,7 @@ private:
   void sparkDamagedBlocks();
 
   Vec2I environmentBiomeTrackPosition() const;
+  Maybe<String> currentWeatherDomain() const;
   AmbientNoisesDescriptionPtr currentAmbientNoises() const;
   WeatherNoisesDescriptionPtr currentWeatherNoises() const;
   AmbientNoisesDescriptionPtr currentMusicTrack() const;
@@ -343,6 +344,14 @@ private:
   GameTimer m_parallaxFadeTimer;
   ParallaxPtr m_currentParallax;
   ParallaxPtr m_nextParallax;
+  Maybe<String> m_weatherParallaxAsset;
+  BiomeConstPtr m_weatherParallaxBiome;
+  ParallaxPtr m_weatherParallax;
+  Maybe<String> m_weatherDomain;
+  Maybe<double> m_lastParallaxWindEpoch;
+  double m_parallaxWindDirectionTime = 0.0;
+  double m_parallaxWindMagnitudeTime = 0.0;
+  double m_parallaxSignedWindTime = 0.0;
 
   Maybe<float> m_overrideGravity;
 
