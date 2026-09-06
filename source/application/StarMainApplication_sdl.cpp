@@ -1,4 +1,5 @@
 #include "StarMainApplication.hpp"
+#include "StarException.hpp"
 #include "StarLogging.hpp"
 #include "StarSignalHandler.hpp"
 #include "StarTickRateMonitor.hpp"
@@ -777,6 +778,19 @@ public:
       }
     } catch (std::exception const& e) {
       Logger::error("Application: exception thrown!");
+#ifndef STAR_SYSTEM_WINDOWS
+      // Windows already gets a native MessageBox from fatalException itself
+      // (see StarException_windows.cpp) before it aborts. This is the actual
+      // catch site most in-game/startup exceptions land in (applicationInit,
+      // renderInit, and the whole main loop all funnel here) - fatalException
+      // calls abort() immediately, so a message box added anywhere *outside*
+      // this specific catch (e.g. further up the call stack) would never be
+      // reached for these. m_sdlWindow is still alive at this point, which
+      // also matters on Wayland specifically: SDL's Wayland backend needs a
+      // parent surface to attach a dialog to and silently shows nothing
+      // without one (unlike X11, where a null parent still works).
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Fatal Error", printException(e, false).c_str(), m_sdlWindow);
+#endif
       fatalException(e, true);
     }
 
@@ -1368,8 +1382,23 @@ int runMainApplication(ApplicationUPtr application, StringList cmdLineArgs) {
     Logger::info("Application: stopped gracefully");
     return 0;
   } catch (std::exception const& e) {
+#ifndef STAR_SYSTEM_WINDOWS
+    // Fallback for exceptions thrown before SdlPlatform exists at all (e.g.
+    // its constructor, which runs Application::startup()) - SdlPlatform::run()'s
+    // own catch (above in this file) handles the much more common case where
+    // a window already exists and passes it as the dialog's parent, since
+    // SDL's Wayland backend needs a parent surface to show anything at all.
+    // No window exists yet here, so this is best-effort: still correct on
+    // X11 and other backends that tolerate an unparented dialog, but likely
+    // silent on pure Wayland - there's no SDL-level workaround for that
+    // short of creating a throwaway window solely to parent this dialog.
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Fatal Error", printException(e, false).c_str(), nullptr);
+#endif
     fatalException(e, true);
   } catch (...) {
+#ifndef STAR_SYSTEM_WINDOWS
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Fatal Error", "Unknown Exception", nullptr);
+#endif
     fatalError("Unknown Exception", true);
   }
   return 1;
