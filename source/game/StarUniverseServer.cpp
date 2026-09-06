@@ -104,6 +104,26 @@ UniverseServer::~UniverseServer() {
   join();
   m_workerPool.stop();
 
+  {
+    // ThreadFunction<void>'s destructor calls finish(), which *rethrows* any
+    // exception the accept thread threw (e.g. an EofException from a client
+    // that bailed on the connection mid-handshake) - safe when reapConnections
+    // drains this list on a normal tick (it catches around finish() below),
+    // but if the server stops before that next tick runs, the plain member
+    // destructor below would rethrow uncaught and crash the whole process.
+    // Drain with the same catch reapConnections uses, so shutdown never
+    // crashes over what should just be a "connection didn't finish" log line.
+    RecursiveMutexLocker acceptThreadsLocker(m_connectionAcceptThreadsMutex);
+    for (auto& function : m_connectionAcceptThreads) {
+      try {
+        function.finish();
+      } catch (std::exception const& e) {
+        Logger::error("UniverseServer: Exception caught accepting new connection: {}", outputException(e, true));
+      }
+    }
+    m_connectionAcceptThreads.clear();
+  }
+
   RecursiveMutexLocker locker(m_mainLock);
   WriteLocker clientsLocker(m_clientsLock);
 

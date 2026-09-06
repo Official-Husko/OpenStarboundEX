@@ -94,14 +94,24 @@ void LocalPacketSocket::sendPackets(List<PacketPtr> packets) {
     MutexLocker locker(outgoingPipe->mutex);
 
 #ifdef STAR_DEBUG
-    // Test serialization if STAR_DEBUG is enabled
+    // Test serialization if STAR_DEBUG is enabled. Must mirror how real
+    // sends/receives do it (see the real TCP/P2P send/receive code above) -
+    // write and read with the connection's netRules, and set compressionMode
+    // on the fresh packet before read(), since several packet types (e.g.
+    // ProtocolResponsePacket, ClientConnectPacket) only override the
+    // netRules-taking read()/write() overloads. Calling the bare no-netRules
+    // read()/write() here used to silently fall through to Packet's no-op
+    // defaults for those types - either writing nothing (immediate EOF on
+    // the read-back) or reading nothing (fields silently left at their
+    // default-constructed values, e.g. an empty player name).
     DataStreamBuffer buffer;
     for (auto inPacket : take(packets)) {
       buffer.clear();
-      inPacket->write(buffer);
+      inPacket->write(buffer, netRules());
       auto outPacket = createPacket(inPacket->type());
+      outPacket->setCompressionMode(inPacket->compressionMode());
       buffer.seek(0);
-      outPacket->read(buffer);
+      outPacket->read(buffer, netRules());
       packets.append(outPacket);
     }
 #endif
