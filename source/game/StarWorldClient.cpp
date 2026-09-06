@@ -1,4 +1,5 @@
 #include "StarWorldClient.hpp"
+#include "StarAssets.hpp"
 #include "StarIterator.hpp"
 #include "StarLogging.hpp"
 #include "StarBiome.hpp"
@@ -492,6 +493,10 @@ float WorldClient::windLevel(Vec2F const& pos) const {
   if (!inWorld())
     return 0.0f;
 
+  auto layer = m_worldTemplate->weatherLayerAt(Vec2I::floor(pos));
+  if (!layer || layer->domain != m_weatherDomain)
+    return WorldImpl::windLevel(m_tileArray, pos, 0.0f);
+
   return WorldImpl::windLevel(m_tileArray, pos, m_weather.wind());
 }
 
@@ -771,8 +776,65 @@ void WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles) {
     }
   }
 
+  auto weatherParallaxAsset = currentWeatherDomain() == m_weatherDomain ? m_weather.weatherParallax() : Maybe<String>();
+  if (weatherParallaxAsset != m_weatherParallaxAsset || environmentBiome != m_weatherParallaxBiome) {
+    m_weatherParallaxAsset = weatherParallaxAsset;
+    m_weatherParallaxBiome = environmentBiome;
+    m_weatherParallax.reset();
+
+    if (weatherParallaxAsset && Root::singleton().assets()->assetExists(*weatherParallaxAsset)) {
+      if (environmentBiome && environmentBiome->parallax) {
+        m_weatherParallax = environmentBiome->parallax->createOverlay(*weatherParallaxAsset);
+      } else {
+        float hueShift = environmentBiome ? environmentBiome->hueShift : 0.0f;
+        Maybe<TreeVariant> treeVariant;
+        if (environmentBiome)
+          treeVariant = environmentBiome->surfacePlaceables.firstTreeType();
+
+        m_weatherParallax = make_shared<Parallax>(*weatherParallaxAsset,
+            m_worldTemplate->worldSeed(), m_worldTemplate->surfaceLevel(), hueShift, std::move(treeVariant));
+      }
+      m_weatherParallax->fadeToSkyColor(m_sky->mainSkyColor());
+    }
+  }
+
+  if (m_weatherParallax) {
+    for (auto layer : m_weatherParallax->layers()) {
+      layer.alpha *= m_weather.weatherIntensity();
+      renderData.parallaxLayers.append(std::move(layer));
+    }
+  }
+
+  double parallaxEpoch = m_sky->epochTime();
+  float parallaxWind = currentWeatherDomain() == m_weatherDomain ? m_weather.wind() : 0.0f;
+  if (m_lastParallaxWindEpoch && parallaxEpoch >= *m_lastParallaxWindEpoch) {
+    double elapsed = parallaxEpoch - *m_lastParallaxWindEpoch;
+    m_parallaxWindDirectionTime += elapsed * (parallaxWind > 0.0f ? 1.0 : -1.0);
+    m_parallaxWindMagnitudeTime += elapsed * std::abs(parallaxWind);
+    m_parallaxSignedWindTime += elapsed * parallaxWind;
+  }
+  m_lastParallaxWindEpoch = parallaxEpoch;
+
   auto functionDatabase = Root::singleton().functionDatabase();
   for (auto& layer : renderData.parallaxLayers) {
+    if (layer.followsWind || layer.windSpeedMultiplier) {
+      double windTime;
+      float horizontalSpeed = layer.speed[0];
+      if (layer.followsWind) {
+        // Parallax texture offsets move the image opposite the offset sign,
+        // so negate the magnitude to make positive wind move imagery right.
+        horizontalSpeed = -std::abs(horizontalSpeed);
+        windTime = layer.windSpeedMultiplier
+            ? m_parallaxSignedWindTime * *layer.windSpeedMultiplier
+            : m_parallaxWindDirectionTime;
+      } else {
+        windTime = m_parallaxWindMagnitudeTime * *layer.windSpeedMultiplier;
+      }
+
+      layer.parallaxOffset[0] += horizontalSpeed * windTime / m_sky->dayLength();
+      layer.speed[0] = 0.0f;
+    }
+
     if (!layer.timeOfDayCorrelation.empty())
       layer.alpha *= clamp((float)functionDatabase->function(layer.timeOfDayCorrelation)->evaluate(m_sky->timeOfDay() / m_sky->dayLength()), 0.0f, 1.0f);
   }
@@ -1036,6 +1098,11 @@ void WorldClient::handleIncomingPackets(List<PacketPtr> const& packets) {
 
     } else if (auto environmentUpdatePacket = as<EnvironmentUpdatePacket>(packet)) {
       m_sky->readUpdate(environmentUpdatePacket->skyDelta, m_clientState.netCompatibilityRules());
+      auto weatherDomain = currentWeatherDomain();
+      if (weatherDomain != m_weatherDomain) {
+        m_weather.clear();
+        m_weatherDomain = take(weatherDomain);
+      }
       m_weather.readUpdate(environmentUpdatePacket->weatherDelta, m_clientState.netCompatibilityRules());
 
     } else if (auto hit = as<HitRequestPacket>(packet)) {
@@ -1311,9 +1378,28 @@ void WorldClient::update(float dt) {
     
     m_sky->setAltitude(m_clientState.windowCenter()[1]);
     
-    particleRegion = m_clientState.window().padded(m_clientConfig.getInt("particleRegionPadding"));
+    auto clientWindow = m_clientState.window();
+    particleRegion = clientWindow.padded(m_clientConfig.getInt("particleRegionPadding"));
+    // Weather generation is layer-scoped, but the particle manager also owns
+    // particles from entities, materials, and effects and must retain the full
+    // client region.
+    RectI weatherParticleRegion = particleRegion;
 
-    m_weather.setVisibleRegion(particleRegion);
+    Maybe<String> weatherDomain = m_weatherDomain;
+    if (clientWindow.isEmpty()) {
+      weatherParticleRegion = {};
+    } else if (auto layer = m_worldTemplate->weatherLayerAt(Vec2I::floor(m_clientState.windowCenter()))) {
+      weatherDomain = layer->domain;
+      weatherParticleRegion = RectI(weatherParticleRegion.xMin(), std::max(weatherParticleRegion.yMin(), layer->minHeight),
+          weatherParticleRegion.xMax(), std::min(weatherParticleRegion.yMax(), layer->maxHeight));
+    } else {
+      weatherParticleRegion = {};
+    }
+
+    if (weatherDomain != m_weatherDomain)
+      weatherParticleRegion = {};
+
+    m_weather.setVisibleRegion(weatherParticleRegion);
   }
   
   m_clientState.setClientPresenceEntities(std::move(clientPresenceEntities));
@@ -1973,6 +2059,8 @@ void WorldClient::initWorld(WorldStartPacket const& startPacket) {
       auto const& tile = m_tileArray->tile(pos);
       return !isRealMaterial(tile.background) && !isSolidColliding(tile.getCollision());
     });
+  if (auto layer = m_worldTemplate->weatherLayerAt(Vec2I::floor(startPacket.playerStart)))
+    m_weatherDomain = layer->domain;
   m_weather.readUpdate(startPacket.weatherData, m_clientState.netCompatibilityRules());
 
   m_lightingCalculator.setMonochrome(Root::singleton().configuration()->get("monochromeLighting").toBool());
@@ -2064,6 +2152,15 @@ void WorldClient::clearWorld() {
 
   m_currentParallax.reset();
   m_nextParallax.reset();
+  m_weatherParallaxAsset.reset();
+  m_weatherParallaxBiome.reset();
+  m_weatherParallax.reset();
+  m_weatherDomain.reset();
+  m_lastParallaxWindEpoch.reset();
+  m_parallaxWindDirectionTime = 0.0;
+  m_parallaxWindMagnitudeTime = 0.0;
+  m_parallaxSignedWindTime = 0.0;
+  m_weather.clear();
   m_parallaxFadeTimer.setDone();
 
   m_clientState.reset();
@@ -2116,6 +2213,18 @@ Vec2I WorldClient::environmentBiomeTrackPosition() const {
   return {m_geometry.xwrap(pos[0]), pos[1]};
 }
 
+Maybe<String> WorldClient::currentWeatherDomain() const {
+  if (!m_worldTemplate)
+    return {};
+
+  auto window = m_clientState.window();
+  if (window.isEmpty())
+    return m_weatherDomain;
+  if (auto layer = m_worldTemplate->weatherLayerAt(Vec2I::floor(m_clientState.windowCenter())))
+    return layer->domain;
+  return {};
+}
+
 AmbientNoisesDescriptionPtr WorldClient::currentAmbientNoises() const {
   if (!inWorld())
     return {};
@@ -2126,6 +2235,9 @@ AmbientNoisesDescriptionPtr WorldClient::currentAmbientNoises() const {
 
 WeatherNoisesDescriptionPtr WorldClient::currentWeatherNoises() const {
   if (!inWorld())
+    return {};
+
+  if (currentWeatherDomain() != m_weatherDomain)
     return {};
 
   auto trackOptions = m_weather.weatherTrackOptions();
@@ -2324,7 +2436,10 @@ bool WorldClient::exposedToWeather(Vec2F const& pos) const {
   if (!inWorld())
     return false;
 
-  if (!isUnderground(pos) && liquidLevel(Vec2I::floor(pos)).liquid == EmptyLiquidId) {
+  auto layer = m_worldTemplate->weatherLayerAt(Vec2I::floor(pos));
+  auto domain = layer && layer->domain ? m_worldTemplate->weatherDomain(*layer->domain) : nullptr;
+  if (domain && layer->domain == m_weatherDomain && pos[1] > domain->effectsMinHeight
+      && liquidLevel(Vec2I::floor(pos)).liquid == EmptyLiquidId) {
     auto assets = Root::singleton().assets();
     float weatherRayCheckDistance = assets->json("/weather.config:weatherRayCheckDistance").toFloat();
     float weatherRayCheckWindInfluence = assets->json("/weather.config:weatherRayCheckWindInfluence").toFloat();

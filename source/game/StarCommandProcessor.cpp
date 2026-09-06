@@ -929,7 +929,7 @@ String CommandProcessor::setWeather(ConnectionId connectionId, String const& arg
   if (arguments.empty()) {
     StringList list;
     bool done = m_universe->executeForClient(connectionId,
-                                             [&list](WorldServer* world, PlayerPtr const&) { list = world->weatherList(); });
+                                             [&list](WorldServer* world, PlayerPtr const& player) { list = world->weatherList(player->position()); });
     return done ? strf("weathers: {}", list.join(", ")) : "failed to query weather";
   }
 
@@ -950,7 +950,7 @@ String CommandProcessor::setWeather(ConnectionId connectionId, String const& arg
   bool done;
   if (coordinate.isNull()) {
     done = m_universe->executeForClient(connectionId,
-                                        [weatherName, force](WorldServer* world, PlayerPtr const&) { world->setWeather(weatherName, force); });
+                                        [weatherName, force](WorldServer* world, PlayerPtr const& player) { world->setWeather(player->position(), weatherName, force); });
   } else {
     done = m_universe->setWeather(coordinate, weatherName, force);
   }
