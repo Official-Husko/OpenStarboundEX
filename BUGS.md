@@ -142,3 +142,81 @@ outside this repo.
   above was tested against vanilla Starbound 1.4.4, since this repo has no bundled assets to run
   its own build standalone) - it's possible OpenStarboundEX's fork has already changed something
   here, for better or worse.
+
+---
+
+## Local (singleplayer) connections silently drop packet fields in Debug builds
+
+**Status:** Fixed - `source/game/StarNetPacketSocket.cpp`, `LocalPacketSocket::sendPackets`.
+Found and fixed once `DEV_LOOP.md`'s `linux-dev` preset made it possible to actually build and run
+this fork locally and try a real local join for the first time - this is exactly the kind of bug
+`CLAUDE.md`'s vanilla-binary validation technique *can't* catch, since it only validates asset
+patches, not compiled engine behavior.
+
+### Summary
+
+`LocalPacketSocket::sendPackets` has a `#ifdef STAR_DEBUG`-only self-test: before handing a packet
+to the local (in-process, singleplayer) connection pipe, it round-trips it through a buffer - write
+it, then immediately read it back into a fresh packet object, and use *that* reconstruction instead
+of the original. It called the bare, no-`NetCompatibilityRules` `write(ds)`/`read(ds)` overloads.
+Several packet types (`ProtocolResponsePacket`, `ClientConnectPacket`, and five others - anything
+declaring only the `NetCompatibilityRules`-taking overload) only implement the *other* overload;
+the one-arg call silently fell through to `Packet`'s no-op base default instead. Depending on which
+side hit it:
+
+- `ProtocolResponsePacket::write(ds)` wrote nothing → the immediate read-back hit `EofException` on
+  the very first field, went uncaught on the connection's accept thread, and (see the next entry)
+  could crash the whole process.
+- `ClientConnectPacket::read(ds)` read nothing → the reconstructed packet silently kept its
+  default-constructed field values - `playerName`/`shipSpecies`/`shipChunks`/etc. all came out
+  empty/zero rather than throwing, which is *more* dangerous, since nothing here reveals a wrong
+  guess up front. This surfaced as `UniverseServer: Logged in player ''` in the log and a
+  downstream `MapException: Key '' not found` trying to create the player's ship world from that
+  empty species string.
+
+Real TCP/P2P sends and receives were never affected - they've always called the two-arg overloads
+(`packet->write(buf, netRules())` / `packet->read(stream, netRules())`) directly. Release builds
+were never affected either, since the whole self-test is compiled out (`#ifdef STAR_DEBUG`). That
+combination - Debug build *and* a local/singleplayer connection - is exactly what nobody had tried
+before `DEV_LOOP.md` made a local Debug build practical to run at all.
+
+### Fix
+
+Made the self-test call the same two-arg overloads real sends/receives use, for both directions:
+`inPacket->write(buffer, netRules())` and `outPacket->read(buffer, netRules())`, plus
+`outPacket->setCompressionMode(inPacket->compressionMode())` before the read (real receive code
+always sets this before calling `read()`, since some packets - `ProtocolResponsePacket` included -
+branch their own read logic on it). This correctly dispatches to whichever overload a given packet
+type actually implements, via `Packet`'s own default one-arg/two-arg forwarding, so it's not
+type-specific - it fixes every current and future packet type the same way, not just the two that
+happened to get hit first.
+
+---
+
+## `UniverseServer` can crash the whole process over a client that simply failed to connect
+
+**Status:** Fixed - `source/game/StarUniverseServer.cpp`, `~UniverseServer()`.
+
+### Summary
+
+Each incoming connection gets its own accept thread (`Thread::invoke`, stored as a
+`ThreadFunction<void>` in `m_connectionAcceptThreads`). If that thread throws (e.g. the
+`EofException` from the bug above, or - independent of that bug - simply a client that times out
+and tears down its connection mid-handshake, which can happen for entirely mundane reasons), the
+exception is caught and stored, not propagated live. `UniverseServer::reapConnections()`, called
+once per server tick, safely drains that list with its own `try`/`catch` around `finish()` (which
+is where a `ThreadFunction`'s stored exception gets rethrown - see its own doc comment: "BEWARE...
+if the function throws, since this destructor calls finish it will throw"). But if the server stops
+*before* another tick's `reapConnections()` runs - e.g. immediately after a failed join, which is
+exactly when this is likely to trigger - `~UniverseServer()`'s implicit member destruction of
+`m_connectionAcceptThreads` calls `~ThreadFunction()` with no catch around it, and the stored
+exception escapes uncaught, taking down the whole process with `std::terminate`.
+
+### Fix
+
+`~UniverseServer()` now explicitly drains `m_connectionAcceptThreads` with the same catch
+`reapConnections()` uses, before the implicit member destructors run - by the end of the explicit
+destructor body, the list is already empty, so the plain member destruction that follows is a
+no-op. This is a general robustness fix, not specific to the bug above - any accept-thread
+exception (including a perfectly ordinary failed/timed-out connection to a real dedicated server)
+could have crashed the server this way before this fix.

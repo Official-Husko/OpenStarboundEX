@@ -5,6 +5,25 @@ A dedicated brainstorm for where the water/liquid work could go next, beyond wha
 how it'd be built, grounded in mechanisms this engine already has (so "needs new engine code"
 means genuinely new, not just "nobody's built it yet").
 
+## My quick scratch pad
+
+randomize and vary the lightrays intensity and direction to create a more dynamic and natural lighting effect in water and liquid environments. (something is ingame already, but could be enhanced. stiff lighting could be made more fluid and responsive to environmental changes)
+
+the waves underwater are still seeming a bit predictablem, more moving and randomized while existing to be more
+alive. also maybe ripples or small disturbances could be added to break up the uniformity and make the underwater environment feel more dynamic. also they are not visible in the night or when lights seem to be missing.
+
+add randomized bubbles spawning from underwater surfaces and disturbances, enhancing the sense of movement and activity in the water.
+
+Debug print add time stamps and maybe try to improve it more with colors and stuff
+
+BUG: water waves or movement seems to stop at a point for a second until some catches up almost and then it continues.
+
+TODO: actually get a working build string (git commit) for the hash for releases
+
+TODO: Try to modulare stuff of the code into .so compiles and only a small executable.
+
+Newer OpenGL version? or maybe vulkan or something is possible.
+
 ## Currents & flow
 
 - **Whirlpools / vortices.** The current system (`MovementController::sampleLiquidFlowVelocity`)
