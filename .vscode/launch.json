@@ -1,0 +1,36 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Client (starbound)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/starbound",
+      "args": ["-bootconfig", "${workspaceFolder}/build/linux-dev/vscode-client-boot.config", "-loglevel", "debug"],
+      "cwd": "${workspaceFolder}/dist",
+      "stopAtEntry": false,
+      "MIMode": "gdb",
+      "externalConsole": false,
+      "preLaunchTask": "Prepare Client Debug"
+    },
+    {
+      "name": "Debug Server (starbound_server)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/starbound_server",
+      "args": ["-bootconfig", "${workspaceFolder}/build/linux-dev/vscode-server-boot.config", "-loglevel", "debug"],
+      "cwd": "${workspaceFolder}/dist",
+      "stopAtEntry": false,
+      "MIMode": "gdb",
+      "externalConsole": false,
+      "preLaunchTask": "Prepare Server Debug"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Client + Server (multiplayer)",
+      "configurations": ["Debug Server (starbound_server)", "Debug Client (starbound)"],
+      "stopAll": true
+    }
+  ]
+}

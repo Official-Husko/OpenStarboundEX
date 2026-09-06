@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build (linux-dev)",
+      "type": "shell",
+      "command": "cmake --build build/linux-dev --target starbound starbound_server -j$(nproc)",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$gcc"],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Gen dev boot config (client)",
+      "type": "shell",
+      "command": "scripts/dev/gen-boot-config.sh build/linux-dev/vscode-client-boot.config build/linux-dev/vscode-client-storage",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "Gen dev boot config (server)",
+      "type": "shell",
+      "command": "scripts/dev/gen-boot-config.sh build/linux-dev/vscode-server-boot.config build/linux-dev/vscode-server-storage",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "Prepare Client Debug",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Build (linux-dev)", "Gen dev boot config (client)"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Prepare Server Debug",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Build (linux-dev)", "Gen dev boot config (server)"],
+      "problemMatcher": []
+    }
+  ]
+}

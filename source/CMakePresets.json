@@ -122,6 +122,19 @@
       }
     },
     {
+      "inherits": "linux-release-clang",
+      "name": "linux-dev",
+      "displayName": "Linux Clang x64 (fast local dev loop)",
+      "binaryDir": "${sourceParentDir}/build/linux-dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTING": false,
+        "STAR_ENABLE_STEAM_INTEGRATION": false,
+        "STAR_ENABLE_DISCORD_INTEGRATION": false,
+        "VCPKG_OVERLAY_PORTS": "${sourceParentDir}/overlay-ports"
+      }
+    },
+    {
       "inherits": "linux-arm-release",
       "name": "linux-arm-release-clang",
       "displayName": "Linux Clang ARM",
@@ -199,6 +212,11 @@
     {
       "name": "linux-release-clang",
       "configurePreset": "linux-release-clang"
+    },
+    {
+      "name": "linux-dev",
+      "configurePreset": "linux-dev",
+      "targets": [ "starbound", "starbound_server" ]
     },
     {
       "name": "linux-arm-release-clang",
