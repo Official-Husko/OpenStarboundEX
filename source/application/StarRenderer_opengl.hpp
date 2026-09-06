@@ -136,10 +136,7 @@ private:
     // textureMovementFactor. 0 for anything that isn't liquid. Used by the
     // world shader to scroll the liquid's texture for its wave/shine effect.
     uint32_t liquidScrollSpeed : 8;
-    // Quantized RenderVertex::param3 (0..1, 256 steps), shoreline foam
-    // intensity. Used by the world shader to fade in its foam noise layer.
-    uint32_t foamIntensity : 8;
-    uint32_t unused : 11;
+    uint32_t unused : 19;
   };
 
   struct GlRenderVertex {

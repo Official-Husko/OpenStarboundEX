@@ -56,13 +56,6 @@ struct RenderVertex {
   // across tile boundaries instead of looking like a patchwork of
   // independently animated tiles (see world.frag).
   float param2 = 0.0f;
-  // Generic tertiary per-vertex scalar payload, defaulted to zero. Currently
-  // used on liquid tile quads as a 0..1 "shoreline foam" intensity - how
-  // close this tile is to a wall along the exposed surface - fading in
-  // smoothly over a couple of tiles rather than as a hard per-tile cutoff.
-  // The world shader turns this into a noise-based foam layer (see
-  // world.frag), never a flat tint.
-  float param3 = 0.0f;
 };
 
 class RenderTriangle {

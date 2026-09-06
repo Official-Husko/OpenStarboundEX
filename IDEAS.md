@@ -89,7 +89,75 @@ means genuinely new, not just "nobody's built it yet").
   color does. Same caveat as refraction: needs a render pass that can read back nearby already-
   drawn pixels, which is a bigger architectural change than anything shipped so far.
 - **Rising bubble particles** from underwater vents or from entities moving through liquid -
-  straightforward particle content, same pattern as the wall-foam particles already shipped.
+  straightforward particle content (nothing currently shipped uses this pattern - see the
+  shoreline foam retrospective below for why the particle approach was tried and dropped there).
+
+### Shoreline foam - removed, revisit later
+
+Shipped, iterated on repeatedly, and ultimately **removed entirely** (reverted to the pre-foam
+state) after it still didn't look right through several rounds of fixes. Full history, so the next
+attempt doesn't repeat the same dead ends:
+
+1. **Flat per-tile tint towards white.** Recolored the actual water - looked like the water changed
+   color, not like foam on top of it.
+2. **Ambient particle system** spawning sprites near walls. Particles inherently have velocity and
+   leave the surface, so regardless of which sprite was used (a star/spark icon, then a gas-cloud
+   puff that turned out to be un-tintable since it's colored blue in its own pixels) it read as
+   "stuff shooting/blowing into the air," not foam sitting on water.
+3. **Shader noise gated by a single per-*tile* wall-proximity value.** Closer, but each liquid tile
+   draws its own independent quad with no shared vertices with its neighbors, so one constant value
+   per tile produced hard vertical steps at tile boundaries next to any wall/object.
+4. Fixed the seam by computing the falloff **per-edge** (left/right x-coordinate) instead of
+   per-tile, so a tile's right edge and its neighbor's left edge - the same world x-coordinate -
+   independently compute the identical value and interpolate smoothly across the boundary. Also
+   discovered the foam was covering a tile's *whole visible height* rather than sitting as a thin
+   skin at the surface, and added a second per-vertex value (the surface's fractional world-space
+   height) so the shader could mask to a ~2px band at the true top.
+5. Even after both fixes, in-game screenshots still showed foam stretching down multiple tiles
+   next to a floating object (a dock), described as "still cut off, still not a thin layer." Root
+   cause never fully confirmed - the leading theory was `isSurface` (whether a tile counts as an
+   exposed top-of-water tile at all) still triggering at multiple depths near a vertical
+   wall/object, since the cellular liquid sim settles unevenly right next to solid geometry (levels
+   like 0.9-0.99 rather than a clean 1.0 at several different rows, each independently qualifying
+   as "surface" and drawing its own band). Tightened once, but a follow-up screenshot after that
+   fix looked unchanged, and a flat-solid-color diagnostic swap (to isolate the band-height math
+   from the noise pattern) was never actually confirmed one way or the other before the whole
+   effort was cut.
+6. Along the way, also asked for a pixel-art-style chunky/pixel-snapped noise pattern instead of a
+   smooth gradient - implemented, but moot once the underlying shape problem meant it was never
+   properly evaluated.
+
+**What made this hard to iterate on**: every check was "make a change, ask the user to look
+in-game, wait for a screenshot description." There's no way to render a frame or view a running
+client from here directly (screenshot capture of a live process is blocked in this sandbox, and
+was confirmed as such - `grim`/`import` both refuse), so every iteration was a multi-minute
+round-trip with only a small, sometimes-ambiguous screenshot to diagnose from - and even a
+"solid color, no noise" diagnostic build never got a confirmed answer before the feature was
+pulled. `DEV_LOOP.md`'s fast local build loop fixed the *build* side of this (seconds, not
+minutes), but the *look-and-confirm* side is still entirely manual and remains the actual
+bottleneck for anything visual.
+
+**Ideas for a different approach next time**:
+
+- Get a definitive answer on the `isSurface`/multi-row-triggering theory *before* touching the
+  visual pattern again - e.g. temporarily render `isSurface` itself as a flat debug color (not
+  foam-shaped at all) to see directly which tiles qualify, rather than inferring it from how foam
+  looks.
+- Consider an actual authored foam texture/sprite sheet (hand-drawn pixel art, sampled and
+  scrolled) instead of procedural noise - matches the game's pixel-art style by construction
+  instead of by tuning a noise function to look chunky, and is much easier to visually reason
+  about from a still screenshot (a human can tell if a specific sprite frame looks right; it's much
+  harder to tell if a noise function's statistical distribution looks right from one frame).
+- Whatever the mechanism, get one clean, unambiguous "yes this is a thin band" confirmation on a
+  totally flat/boring test case (open water, far from any object) before ever testing near a
+  complex object like a dock - the dock scenario conflates at least two independent questions
+  (is the *band* thin? is *which tiles* get a band correct?) into one screenshot, which made this
+  much harder to debug than it needed to be.
+- All the plumbing this used (a generic per-vertex payload field, bits packed into the previously-
+  `unused` space of the OpenGL per-vertex integer attribute) was fully reverted, not left half-in -
+  see the "Water wave/shine" entry in `FEATURES.md` for the one still-shipped mechanism
+  (`textureMovementFactor` scrolling) that uses the same pattern and remains a working reference
+  for how to add a new per-tile shader input cleanly.
 
 ## Hazards & mechanics
 

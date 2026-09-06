@@ -36,25 +36,62 @@ what could come next. See `CLAUDE.md` for the technical orientation.
   `source/application/StarRenderer_opengl.{hpp,cpp}` (packs the quantized value into
   previously-`unused` bits of the per-vertex integer attribute - no new vertex attributes, no new
   shader effect).
-- **Shoreline foam, as a shader noise layer.** Went through two wrong approaches before this one.
-  v1 blended whole liquid tiles towards white - flat, tile-aligned, recolored the actual water.
-  v2 was an ambient particle system spawning sprites that drifted off the water with real
-  velocity - read as "stuff shooting/blowing into the air" regardless of which sprite was tried
-  (a star/spark icon, then a gas-cloud puff that turned out to be un-tintable since it's colored
-  blue in its own pixels, not white). Current version is neither: a per-vertex "how close is this
-  tile to a wall" intensity (`RenderVertex::param3`, fading smoothly over ~3 tiles, computed in
-  `TilePainter::produceLiquidPrimitives`) gates a procedural noise pattern computed entirely in
-  `world.frag` from world position + time - thresholded into bubble-like clusters rather than a
-  smooth gradient, slowly drifting so it doesn't look like a static decal. Nothing is spawned,
-  nothing has velocity, nothing leaves the water's surface - it's a layer on the water, not an
-  object in the world. `source/rendering/StarTilePainter.cpp`,
-  `assets/opensb/rendering/effects/world.{vert,frag}`, `source/application/StarRenderer_opengl.{hpp,cpp}`
-  (packs the quantized intensity into more of the same previously-`unused` bits the wave/shine
-  value uses).
+- **Shoreline foam - removed.** Went through several iterations (flat tile tint, particles, a
+  shader noise layer with progressively fixed seam/height bugs) but still didn't look right after
+  repeated rounds of fixes, so it was fully reverted rather than left in a half-working state - no
+  foam-related code remains in `RenderVertex`, the GL vertex packing, `world.{vert,frag}`, or
+  `TilePainter::produceLiquidPrimitives`. Full history, what was learned, and ideas for a
+  different approach next time are in `IDEAS.md`'s "Shoreline foam - removed, revisit later"
+  entry - read that before attempting foam again.
 
 `assets/opensb/client.config.patch` also turned up a second, more general instance of an
 engine-level JSON patch bug — see `BUGS.md` — worth reading before writing any more
 `.config.patch` files, since it's not limited to `.weather` as first thought.
+
+### Local dev-loop tooling
+
+Building and running this fork locally (instead of waiting on a multi-minute GitHub Actions CI
+build for every change) is now real - see `DEV_LOOP.md` for the full writeup. Highlights:
+
+- A `linux-dev` CMake preset (Debug, tests/Steam/Discord off, own `build/linux-dev` directory) plus
+  `scripts/dev/watch.sh` (incremental rebuild on save via `watchexec`+`ninja`+`sccache`) and
+  `scripts/dev/run-dev.sh` (runs the built binary against a real OpenStarboundEX install's assets,
+  since this repo ships none of its own).
+- `scripts/dev/run-dev-multiplayer.sh` runs a dedicated server and a client together, each on
+  scratch storage, for testing networked behavior locally.
+- `.vscode/launch.json`/`tasks.json` (gitignored, local-machine-only) wire up `cppdbg`/gdb debug
+  configs for the client, the server, and both together as a compound.
+- Two real vcpkg build-environment issues hit and fixed along the way (an `overlay-ports/jemalloc`
+  patch for a libstdc++-internal symbol vcpkg's jemalloc port assumed still exists; a false-alarm
+  `autoconf-archive`-missing error that was actually just an install-timing race) - see
+  `DEV_LOOP.md`'s "vcpkg build quirks" section.
+- **On-screen build identification**, since getting a local dev build actually running exposed a
+  real gap: the git commit (`StarSourceIdentifierString`) doesn't change between uncommitted
+  edits, so it can't answer "did my last change actually get rebuilt?" during iterative local
+  testing. Fixed with a build stamp that's regenerated at *every* build invocation (not just every
+  CMake reconfigure, unlike the existing git-derived version string) -
+  `source/core/GenerateBuildStamp.cmake`, wired into `star_core` via a custom target with no
+  declared inputs so it always reruns. Shown two ways: an always-visible bottom-right corner label
+  in-game (`MainInterface::renderBuildInfo`, `source/frontend/StarMainInterface.cpp`) reading
+  `OSB v0.1.15 - SB v1.4.4` / `hash (xxxxxxxxxxxx)`, and appended to the existing startup log line
+  (`Compiled with Clang <version> at <build date>`, `source/client/StarClientApplication.cpp`).
+
+Two real engine bugs (not content bugs) turned up once a local build made it possible to actually
+try a real local join for the first time - both are now fixed, full writeups in `BUGS.md`:
+
+- **Local-connection packet round-trip silently dropped fields in Debug builds.** A `#ifdef
+  STAR_DEBUG`-only self-test in `LocalPacketSocket::sendPackets` called the wrong (no-`
+  NetCompatibilityRules`) overload of `read`/`write` for several packet types, which for those
+  types is a silent no-op rather than a compile error - manifested as an immediate `EofException`
+  on join (nothing written, so the read-back hit EOF on the first field) and, once that was fixed,
+  an empty player name silently reaching the server (nothing read back, so the reconstructed packet
+  kept its default-constructed fields) and a downstream `MapException`.
+- **A client that simply failed to connect could crash the whole server.** An accept thread's
+  stored exception (from the bug above, or any other ordinary failed/timed-out connection) got
+  safely caught and logged on a normal server tick, but rethrown uncaught if the server stopped
+  before that tick ran - e.g. right after a failed join, which is exactly when it's likely to
+  matter. `UniverseServer`'s destructor now drains pending accept threads with the same catch its
+  own `reapConnections()` already used, before relying on implicit member destruction.
 
 ## Ideas for later
 
@@ -62,27 +99,21 @@ Water/liquid physics ideas now live in their own file, `IDEAS.md` - it grew larg
 more room than fits here. Weather ideas are on the `weather-expansion` branch's version of this
 file, not this one.
 
-### Water physics - further shimmer/foam tuning
+### Water physics - further shimmer tuning
 
 - The displacement amplitudes/frequencies and the `0.045` speed multiplier in `world.frag` are a
   second-pass guess, not tuned against an actual screenshot. `textureMovementFactor`'s original
   intended unit is still unknown (never consumed by any code before this pass, so there's nothing
   to cross-check against) - "produces visible, non-mechanical-looking motion at a reasonable
   speed" is the current bar, not "matches original intent."
-- Foam currently only appears near *any* wall a surface tile is adjacent to (shoreline-style), not
-  specifically where a current is flowing into one - simpler and matches "foam along a pond's
-  edge" better, but means it no longer conveys current strength/direction the way the old
-  particle version's spawn rate did. Could reintroduce that as a secondary intensity factor later.
-- The noise scale (`* 4.0`), threshold (`smoothstep(0.48, 0.7, ...)`), drift speed, and opacity
-  (`* 0.85`) in `world.frag` are first-guess values for "looks like clusters of foam" - not tuned
-  against an actual screenshot.
-- Foam only fades in near horizontal walls; waterfalls hitting a floor (vertical collision) don't
-  currently get any.
 - Several rendering bugs have shipped and gone unnoticed until actually seen in-game (invisible
   ripple, star-shaped "foam", blue "white" foam, a too-fast/too-linear wave, particles reading as
-  "blowing into the air"). All were caught by the user playing a real build, not by compiling
-  cleanly or reasoning about the code - there's no way to render a frame or view a running client
-  from here, so treat anything visual in this file as unverified until someone's actually looked
-  at it. Static inspection (unpacking and viewing the actual sprite/texture pixels, as opposed to
+  "blowing into the air") - and shoreline foam specifically never got past this stage at all
+  despite several rounds of fixes, and was removed rather than left half-working (see `IDEAS.md`).
+  All of this was caught (or, in foam's case, never fully resolved) by the user playing a real
+  build, not by compiling cleanly or reasoning about the code - there's no way to render a frame or
+  view a running client from here (screenshot capture of a live process is blocked in this
+  sandbox), so treat anything visual in this file as unverified until someone's actually looked at
+  it. Static inspection (unpacking and viewing the actual sprite/texture pixels, as opposed to
   assuming from a filename) has caught real bugs before they even reached the user, though - worth
   doing by default for anything visual, not just after a report.

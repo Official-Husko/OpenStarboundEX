@@ -16,8 +16,6 @@ in vec4 fragmentColor;
 in float fragmentLightMapMultiplier;
 in vec2 fragmentLightMapCoordinate;
 flat in float fragmentLiquidScrollSpeed;
-flat in float fragmentFoamIntensity;
-in vec2 fragmentWorldPosition;
 
 out vec4 outColor;
 
@@ -68,26 +66,6 @@ vec3 sampleLight(vec2 coord, vec2 scale) {
   return lower + (upper / (vec3(1.) + upper));
 }
 
-// Shoreline foam. Pseudo-random per-pixel noise (never anything per-tile),
-// so the bubble pattern is genuinely irregular and doesn't repeat visibly
-// or line up with tile edges.
-float foamHash(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
-}
-
-float foamValueNoise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  float a = foamHash(i);
-  float b = foamHash(i + vec2(1.0, 0.0));
-  float c = foamHash(i + vec2(0.0, 1.0));
-  float d = foamHash(i + vec2(1.0, 1.0));
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-
 void main() {
   vec2 sampleCoordinate = fragmentTextureCoordinate;
 
@@ -134,26 +112,6 @@ void main() {
     discard;
 
   vec4 finalColor = texColor * fragmentColor;
-
-  // Shoreline foam: a noise-based bubble pattern layered on top of the
-  // water, not a flat tint and not a particle - nothing here ever leaves
-  // the water's surface. fragmentFoamIntensity (from StarTilePainter.cpp)
-  // fades in near a wall over a couple of tiles; on top of that, the noise
-  // pattern's own value further shapes it into clusters of bubbles rather
-  // than a uniform wash, and the whole pattern drifts slowly over time so
-  // it doesn't look like a static decal.
-  if (fragmentFoamIntensity > 0.0) {
-    vec2 fp = fragmentWorldPosition * 4.0;
-    float n1 = foamValueNoise(fp + vec2(time * 0.08, time * 0.05));
-    float n2 = foamValueNoise(fp * 2.3 - vec2(time * 0.05, 0.0) + 11.0);
-    float n = n1 * 0.65 + n2 * 0.35;
-
-    // Thresholded into discrete-looking clusters rather than a smooth
-    // gradient - clusters read as "clumps of foam", a smooth gradient reads
-    // as "the water changed color".
-    float bubbles = smoothstep(0.48, 0.7, n);
-    finalColor.rgb = mix(finalColor.rgb, vec3(1.0), bubbles * fragmentFoamIntensity * 0.85);
-  }
 
   float finalLightMapMultiplier = fragmentLightMapMultiplier * lightMapMultiplier;
   if (texColor.a == 0.99607843137)

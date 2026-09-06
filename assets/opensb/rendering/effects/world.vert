@@ -22,8 +22,6 @@ out vec4 fragmentColor;
 out float fragmentLightMapMultiplier;
 out vec2 fragmentLightMapCoordinate;
 flat out float fragmentLiquidScrollSpeed;
-flat out float fragmentFoamIntensity;
-out vec2 fragmentWorldPosition;
 
 void main() {
   vec2 screenPosition = (vertexTransform * vec3(vertexPosition, 1.0)).xy;
@@ -53,13 +51,6 @@ void main() {
   // Bits 5-12: quantized textureMovementFactor (0..8, 0 for non-liquid),
   // used by the water wave/shine effect.
   fragmentLiquidScrollSpeed = float((vertexData >> 5) & 0xFF) / 255.0 * 8.0;
-  // Bits 13-20: quantized shoreline foam intensity (0..1).
-  fragmentFoamIntensity = float((vertexData >> 13) & 0xFF) / 255.0;
-
-  // vertexPosition is world space (tiles), before the camera transform -
-  // used to sample the foam noise so it's anchored to the world instead of
-  // the screen (panning/zooming the camera doesn't slide the foam pattern).
-  fragmentWorldPosition = vertexPosition;
 
   gl_Position = vec4(screenPosition / screenSize * 2.0 - 1.0, 0.0, 1.0);
 }
