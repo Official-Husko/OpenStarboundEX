@@ -1,7 +1,7 @@
 # Water & Liquid Physics Ideas
 
 A dedicated brainstorm for where the water/liquid work could go next, beyond what's already in
-`FEATURES.md`. Nothing here is committed to — it's a menu, not a roadmap. Each idea notes roughly
+`CHANGES.md`. Nothing here is committed to — it's a menu, not a roadmap. Each idea notes roughly
 how it'd be built, grounded in mechanisms this engine already has (so "needs new engine code"
 means genuinely new, not just "nobody's built it yet").
 
@@ -23,6 +23,11 @@ TODO: actually get a working build string (git commit) for the hash for releases
 TODO: Try to modulare stuff of the code into .so compiles and only a small executable.
 
 Newer OpenGL version? or maybe vulkan or something is possible.
+
+improve main menu, especially mods page.
+
+add or rather show while loading log lines printed in the window until the game menu loaded and replaces it
+to avoid having a black screen and no loading progress
 
 ## Currents & flow
 
@@ -174,7 +179,7 @@ bottleneck for anything visual.
   much harder to debug than it needed to be.
 - All the plumbing this used (a generic per-vertex payload field, bits packed into the previously-
   `unused` space of the OpenGL per-vertex integer attribute) was fully reverted, not left half-in -
-  see the "Water wave/shine" entry in `FEATURES.md` for the one still-shipped mechanism
+  see the "Add: water wave/shine" entry in `CHANGES.md` for the one still-shipped mechanism
   (`textureMovementFactor` scrolling) that uses the same pattern and remains a working reference
   for how to add a new per-tile shader input cleanly.
 
