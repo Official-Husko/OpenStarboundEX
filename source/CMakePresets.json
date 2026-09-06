@@ -216,7 +216,7 @@
     {
       "name": "linux-dev",
       "configurePreset": "linux-dev",
-      "targets": [ "starbound", "starbound_server" ]
+      "targets": [ "starbound", "starbound_server", "asset_packer" ]
     },
     {
       "name": "linux-arm-release-clang",

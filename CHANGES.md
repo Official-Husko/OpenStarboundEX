@@ -1,9 +1,10 @@
 # Changes
 
-Changelog for this fork, maintained on every change - each entry tagged `Add:`, `Fix:`,
-`Change:`, or `Remove:`. Newest first. See `CLAUDE.md` for technical orientation, `IDEAS.md` for
-not-yet-built ideas, `BUGS.md` for engine-level bugs with full reproduction detail, and
-`DEV_LOOP.md` for the local build loop.
+Technical changelog for this fork, maintained on every change - each entry tagged `Add:`, `Fix:`,
+`Change:`, or `Remove:`. Newest first. See `CHANGELOG.md` for the plain-language, player-facing
+version of this (not every entry here has one - only things a player would actually notice), and
+`CLAUDE.md` for technical orientation, `IDEAS.md` for not-yet-built ideas, `BUGS.md` for
+engine-level bugs with full reproduction detail, and `DEV_LOOP.md` for the local build loop.
 
 > **Branch note:** this is `main`. A separate `weather-expansion` branch has additional
 > gusting-wind/lightning/fog-and-hail weather work (and its own changelog) that hasn't been
@@ -11,6 +12,17 @@ not-yet-built ideas, `BUGS.md` for engine-level bugs with full reproduction deta
 
 ## main branch
 
+- **Fix**: local dev-loop builds silently ignored every `assets/opensb/` edit. `run-dev.sh` points
+  a real OpenStarboundEX install's `assetDirectories` at itself, and that install's `opensb.pak`
+  is just a plain file sitting there from whenever it was last packed (e.g. an old CI build) -
+  nothing regenerated it from this repo's live `assets/opensb/` source, so editing a `.patch`
+  file, a shader, or a `.config` had *zero* effect on a running dev build no matter how many times
+  the binaries were rebuilt and rerun. New `scripts/dev/pack-assets.sh` repacks `assets/opensb/`
+  (via a freshly-built `asset_packer`, ~0.3-0.6s) into the real install's `opensb.pak`; new
+  `scripts/dev/build-and-pack.sh` builds the client/server/packer and then calls it, and is now
+  what `scripts/dev/watch.sh` (which now also watches `assets/opensb/`, not just `source/`), the
+  `.vscode` "Build (linux-dev)" task (so F5 gets it too), and `run-dev.sh` itself (as a standalone
+  safety net) all actually run. See `DEV_LOOP.md`.
 - **Add**: native fatal-error dialog on Linux/macOS. Windows already showed a `MessageBox` from
   `fatalException`/`fatalError` (`StarException_windows.cpp`) before aborting; Linux/macOS just
   logged and called `abort()` with nothing visible to the user at all. Added an

@@ -65,22 +65,36 @@ public binary cache. Only needs doing once.
 
 ## Day to day
 
-Two scripts under `scripts/dev/`:
+Scripts under `scripts/dev/`:
 
-- **`scripts/dev/watch.sh`** - runs `watchexec` over `source/`, rebuilding just the `starbound`
-  and `starbound_server` targets (Ninja only recompiles what actually changed and relinks) on
-  every save. Leave this running in a terminal while editing.
+- **`scripts/dev/watch.sh`** - runs `watchexec` over both `source/` and `assets/opensb/`, running
+  `scripts/dev/build-and-pack.sh` on every save (see below for what that does). Leave this running
+  in a terminal while editing.
+- **`scripts/dev/build-and-pack.sh`** - builds `starbound`/`starbound_server`/`asset_packer`, then
+  repacks `assets/opensb/` into the real install's `opensb.pak` (see `pack-assets.sh` below). This
+  is the one thing that actually needs to run on every change, since either a C++ edit or an
+  `assets/opensb` edit needs it. Also what the `.vscode` "Build (linux-dev)" task runs, so F5 gets
+  this too, not just `watch.sh`.
+- **`scripts/dev/pack-assets.sh`** - packs `assets/opensb/` with the freshly-built `asset_packer`
+  into `$OPENSTARBOUND_HOME/assets/opensb.pak` (~0.3-0.6s). **Without this, editing anything under
+  `assets/opensb/` - a `.patch` file, a shader, a `.config` - has zero effect on a running dev
+  build**: `run-dev.sh` points `assetDirectories` at a real install, and that install's
+  `opensb.pak` is just a plain file sitting there from whenever it was last packed (e.g. an old CI
+  build) - nothing automatically regenerates it from this repo's live `assets/opensb/` source.
+  This was a real gap for a while: every shader/asset change made during dev-loop testing was
+  silently untested, since only the C++ binaries were ever being rebuilt and rerun.
 - **`scripts/dev/run-dev.sh [client|server]`** - runs the freshly-built `dist/starbound(_server)`
   against a *real* OpenStarboundEX install's assets, since this repo ships no base game assets of
-  its own (see `CLAUDE.md`) and a Debug build's `dist/` has nothing to load on its own. Defaults
-  to `~/Games/OpenStarboundEX` (override with `OPENSTARBOUND_HOME`), and **shares that install's
-  `storage/` by default - it runs against your real savegames**, not a throwaway world. Set
-  `OPENSTARBOUND_DEV_STORAGE` to a scratch directory instead if you'd rather a Debug build not
-  touch real saves while iterating.
+  its own (see `CLAUDE.md`) and a Debug build's `dist/` has nothing to load on its own. Also calls
+  `pack-assets.sh` itself first (redundant, and harmless, if `watch.sh` already did it - but
+  matters if you build manually without `watch.sh` running). Defaults to `~/Games/OpenStarboundEX`
+  (override with `OPENSTARBOUND_HOME`), and **shares that install's `storage/` by default - it
+  runs against your real savegames**, not a throwaway world. Set `OPENSTARBOUND_DEV_STORAGE` to a
+  scratch directory instead if you'd rather a Debug build not touch real saves while iterating.
 
-So in practice: `scripts/dev/watch.sh` in one terminal, edit code, save, wait for it to report the
-build finished, then `scripts/dev/run-dev.sh` in another terminal whenever you want to actually
-look at the result.
+So in practice: `scripts/dev/watch.sh` in one terminal, edit code *or* assets, save, wait for it to
+report the build finished, then `scripts/dev/run-dev.sh` in another terminal whenever you want to
+actually look at the result.
 
 ## Running client + server together (local multiplayer testing)
 

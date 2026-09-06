@@ -19,9 +19,15 @@ if [ ! -d build/linux-dev ]; then
   cmake --preset linux-dev -S source
 fi
 
-echo "Watching source/ - Ctrl+C to stop. Edit a .cpp/.hpp and save to rebuild."
+echo "Watching source/ and assets/opensb/ - Ctrl+C to stop. Edit a .cpp/.hpp or any"
+echo "assets/opensb file (.patch, .vert/.frag, .config, ...) and save to rebuild."
+# No --exts filter: assets/opensb has dozens of extensions (.patch, .vert,
+# .frag, .config, .lua, .png, ...) and a hardcoded list would inevitably miss
+# some - both cmake (nothing to do if no .cpp/.hpp changed) and asset_packer
+# (~0.6s for the whole assets/opensb tree) are cheap enough that watching
+# everything under both directories costs nothing extra in practice.
 exec watchexec \
   --watch source \
-  --exts cpp,hpp,h,cc \
+  --watch assets/opensb \
   --debounce 300ms \
-  -- cmake --build build/linux-dev --target starbound starbound_server -j"$(nproc)"
+  -- scripts/dev/build-and-pack.sh

@@ -40,6 +40,13 @@ STORAGE_DIR="${OPENSTARBOUND_DEV_STORAGE:-$HOME_DIR/storage/}"
 BOOT_CONFIG="build/linux-dev/dev-boot-$TARGET.config"
 scripts/dev/gen-boot-config.sh "$BOOT_CONFIG" "$STORAGE_DIR"
 
+# Repacks assets/opensb into $HOME_DIR's opensb.pak - if scripts/dev/watch.sh
+# is already running this is redundant (it does the same on every save) but
+# harmless (~0.6s); if it's not running (e.g. a one-off manual build), this
+# is what stops a stale, previously-packed opensb.pak from silently masking
+# every local .patch/shader/config edit. See scripts/dev/pack-assets.sh.
+OPENSTARBOUND_HOME="$HOME_DIR" scripts/dev/pack-assets.sh
+
 if [ "$TARGET" = "server" ]; then
   BIN="dist/starbound_server"
 else
