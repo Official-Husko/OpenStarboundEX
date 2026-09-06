@@ -7,6 +7,7 @@
 #include "StarJsonExtra.hpp"
 #include "StarRoot.hpp"
 #include "StarVersionOptionParser.hpp"
+#include "StarVersion.hpp"
 #include "StarPlayer.hpp"
 #include "StarPlayerStorage.hpp"
 #include "StarPlayerLog.hpp"
@@ -166,7 +167,7 @@ void ClientApplication::startup(StringList const& cmdLineArgs) {
   m_root = rootLoader.initOrDie(cmdLineArgs).first;
   Logger::info("{}", rootLoader.getVersionString());
   #ifdef __clang__
-  Logger::info("Compiled with Clang {}", __clang_version__);
+  Logger::info("Compiled with Clang {} at {}", __clang_version__, StarBuildDateString);
   #endif
 }
 
@@ -494,6 +495,36 @@ void ClientApplication::render() {
 
   if (!m_errorScreen->accepted())
     m_errorScreen->render();
+
+  renderBuildInfo();
+}
+
+void ClientApplication::renderBuildInfo() {
+  // Deliberately muted, no background - a corner watermark for dev-loop
+  // testing, not something that should compete with the actual UI for
+  // attention on any screen.
+  TextStyle style;
+  style.fontSize = 8;
+  style.color = Vec4B(160, 160, 160, 140);
+  style.shadow = Vec4B(0, 0, 0, 0);
+  m_guiContext->setTextStyle(style);
+
+  float scale = m_guiContext->interfaceScale();
+  float lineHeight = style.fontSize * scale;
+  Vec2F margin = Vec2F::filled(8) * scale;
+  float width = m_guiContext->windowWidth();
+
+  // StarBuildStampString is generated fresh on every build invocation (see
+  // GenerateBuildStamp.cmake), unlike the git commit (StarSourceIdentifierString)
+  // which stays identical across uncommitted dev-loop edits and so can't
+  // answer "did my last change actually get rebuilt?".
+  m_guiContext->renderText(strf("hash ({})", StarBuildStampString),
+      TextPositioning(Vec2F(width - margin[0], margin[1]), HorizontalAnchor::RightAnchor, VerticalAnchor::BottomAnchor));
+
+  m_guiContext->renderText(strf("OSBEX v{} - SB v{}", OpenStarVersionString, StarVersionString),
+      TextPositioning(Vec2F(width - margin[0], margin[1] + lineHeight), HorizontalAnchor::RightAnchor, VerticalAnchor::BottomAnchor));
+
+  m_guiContext->clearTextStyle();
 }
 
 void ClientApplication::getAudioData(int16_t* sampleData, size_t frameCount) {

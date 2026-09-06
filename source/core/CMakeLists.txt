@@ -231,7 +231,19 @@ ELSEIF (STAR_SYSTEM_FAMILY_WINDOWS)
 ENDIF ()
 
 CONFIGURE_FILE (StarVersion.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/StarVersion.cpp)
-ADD_LIBRARY (star_core OBJECT ${star_core_SOURCES} ${star_core_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/StarVersion.cpp)
+
+# Unlike StarVersion.cpp.in above (a CONFIGURE_FILE, only rerun when CMake
+# itself reconfigures), this custom target has no declared inputs, so it
+# reruns - and StarBuildStamp.cpp gets rewritten with a fresh timestamp -
+# on every single build invocation. See GenerateBuildStamp.cmake.
+ADD_CUSTOM_TARGET (star_build_stamp
+  BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/StarBuildStamp.cpp
+  COMMAND ${CMAKE_COMMAND} -DOUT=${CMAKE_CURRENT_BINARY_DIR}/StarBuildStamp.cpp -P ${CMAKE_CURRENT_SOURCE_DIR}/GenerateBuildStamp.cmake
+  COMMENT "Generating build stamp"
+)
+
+ADD_LIBRARY (star_core OBJECT ${star_core_SOURCES} ${star_core_HEADERS} ${CMAKE_CURRENT_BINARY_DIR}/StarVersion.cpp ${CMAKE_CURRENT_BINARY_DIR}/StarBuildStamp.cpp)
+ADD_DEPENDENCIES (star_core star_build_stamp)
 
 IF(STAR_PRECOMPILED_HEADERS)
   TARGET_PRECOMPILE_HEADERS (star_core PUBLIC StarPch.hpp)

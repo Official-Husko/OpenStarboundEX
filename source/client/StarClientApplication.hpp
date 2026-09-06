@@ -73,6 +73,13 @@ private:
   };
 
   void renderReload();
+  // Always-on corner watermark with the running build's version/hash, on
+  // every screen (title, menus, in-game) - dev-loop tooling (see
+  // DEV_LOOP.md), so it's obvious at a glance whether a given test is
+  // actually running the build you think it is. Lives here rather than in
+  // MainInterface (which only exists once a game session starts) so it
+  // covers the title screen too.
+  void renderBuildInfo();
 
   void changeState(MainAppState newState);
   void setError(String const& error);
